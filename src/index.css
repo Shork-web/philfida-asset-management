@@ -1,0 +1,59 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+  color: #1c2412;
+  background-color: #f5f7f4;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  /* Green & Orange theme (PhilFIDA) */
+  --color-primary: #166534;
+  --color-primary-hover: #14532d;
+  --color-accent: #ea580c;
+  --color-accent-hover: #c2410c;
+  --color-danger: #dc2626;
+  --color-danger-hover: #b91c1c;
+  --color-success: #15803d;
+  --color-warning: #ea580c;
+  --color-sidebar: #14532d;
+  --color-sidebar-hover: #166534;
+  --color-gray-50: #f8faf8;
+  --color-gray-100: #f0f4ee;
+  --color-gray-200: #e2e8dc;
+  --color-gray-300: #c8d0c0;
+  --color-gray-400: #8a9580;
+  --color-gray-500: #5c6654;
+  --color-gray-600: #434d3d;
+  --color-gray-700: #2d3528;
+  --color-gray-800: #1e2418;
+  --color-gray-900: #141a10;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow-sm: 0 1px 2px rgba(22, 101, 52, 0.06);
+  --shadow: 0 1px 3px rgba(22, 101, 52, 0.08), 0 1px 2px rgba(0,0,0,0.04);
+  --shadow-md: 0 4px 6px -1px rgba(22, 101, 52, 0.1), 0 2px 4px -2px rgba(0,0,0,0.05);
+  --shadow-lg: 0 10px 15px -3px rgba(22, 101, 52, 0.12), 0 4px 6px -4px rgba(0,0,0,0.06);
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background-color: #f5f7f4;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+button {
+  cursor: pointer;
+}
