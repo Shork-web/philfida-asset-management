@@ -176,6 +176,7 @@ export default function Login() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [displayName, setDisplayName] = useState('')
   const [masterKey, setMasterKey] = useState('')
+  const [showMasterKey, setShowMasterKey] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
 
   const [passwordFocused, setPasswordFocused] = useState(false)
@@ -198,6 +199,7 @@ export default function Login() {
     setError('')
     setSuccess('')
     setMasterKey('')
+    setShowMasterKey(false)
     setConfirmPassword('')
     setShowPassword(false)
     setShowConfirmPassword(false)
@@ -434,11 +436,16 @@ export default function Login() {
               {/* Master key — shown at top on sign-up */}
               {isSignUp && signUpAllowed && (
                 <InputField
-                  id="auth-master-key" label="Master Key" type="password"
-                  icon={<IconKey />} value={masterKey}
+                  id="auth-master-key"
+                  label="Master Key"
+                  type={showMasterKey ? 'text' : 'password'}
+                  icon={<IconKey />}
+                  value={masterKey}
                   onChange={(e) => { setMasterKey(e.target.value); clearError() }}
                   placeholder="Enter key provided by administrator"
-                  required autoComplete="off"
+                  required
+                  autoComplete="off"
+                  rightSlot={eyeToggle(showMasterKey, setShowMasterKey)}
                 />
               )}
 
