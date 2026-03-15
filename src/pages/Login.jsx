@@ -50,6 +50,7 @@ function friendlyError(code) {
     'auth/cancelled-popup-request': 'Please complete the sign-in in the popup window.',
     'auth/account-exists-with-different-credential': 'An account already exists with this email using a different sign-in method. Try signing in with email and password, or use the same method you used when you first signed up.',
     'auth/credential-already-in-use': 'This credential is already linked to another account.',
+    'auth/unauthorized-domain': 'This domain is not allowed for sign-in. Add your site’s domain (e.g. your-app.vercel.app) in Firebase Console → Authentication → Settings → Authorized domains.',
   }
   return map[code] || `Something went wrong (${code || 'unknown'}). Please try again.`
 }
@@ -79,6 +80,12 @@ export default function Login() {
 
   const onGoogleSignIn = async () => {
     setError('')
+    if (isSignUp && signUpAllowed) {
+      if (masterKey.trim() !== MASTER_KEY.trim()) {
+        setError('Enter the master key below to create an account with Google.')
+        return
+      }
+    }
     setGoogleLoading(true)
     try {
       const auth = getFirebaseAuth()
@@ -248,6 +255,22 @@ export default function Login() {
             </form>
           ) : (
             <>
+              {/* When signing up, require master key first (for both Google and email) */}
+              {isSignUp && signUpAllowed && (
+                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
+                  <label htmlFor="auth-master-key">Master Key (required for new accounts)</label>
+                  <input
+                    id="auth-master-key"
+                    type="password"
+                    placeholder="Enter master key from administrator"
+                    value={masterKey}
+                    onChange={(e) => { setMasterKey(e.target.value); clearError() }}
+                    required
+                    autoComplete="off"
+                  />
+                </div>
+              )}
+
               {/* Google Sign-In — show for both sign-in and sign-up */}
               <div className="auth-social">
                 <button
@@ -277,33 +300,17 @@ export default function Login() {
 
               <form className="auth-form" onSubmit={onSubmit}>
                 {isSignUp && (
-                  <>
-                    <div className="form-group">
-                      <label htmlFor="auth-name">Full Name</label>
-                      <input
-                        id="auth-name"
-                        type="text"
-                        placeholder="Juan Dela Cruz"
-                        value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
-                        autoComplete="name"
-                      />
-                    </div>
-                    {signUpAllowed && (
-                      <div className="form-group">
-                        <label htmlFor="auth-master-key">Master Key</label>
-                        <input
-                          id="auth-master-key"
-                          type="password"
-                          placeholder="Enter master key from administrator"
-                          value={masterKey}
-                          onChange={(e) => { setMasterKey(e.target.value); clearError() }}
-                          required
-                          autoComplete="off"
-                        />
-                      </div>
-                    )}
-                  </>
+                  <div className="form-group">
+                    <label htmlFor="auth-name">Full Name</label>
+                    <input
+                      id="auth-name"
+                      type="text"
+                      placeholder="Juan Dela Cruz"
+                      value={displayName}
+                      onChange={(e) => setDisplayName(e.target.value)}
+                      autoComplete="name"
+                    />
+                  </div>
                 )}
 
                 <div className="form-group">

@@ -48,7 +48,21 @@ firebase deploy --only firestore
 
 The included `firestore.rules` allows read/write for development. For production, add [Firebase Auth](https://firebase.google.com/docs/auth) and restrict access.
 
-## 5. Run the app
+## 5. Authorized domains (for Google sign-in on Vercel)
+
+If you deploy to Vercel and get **"auth/unauthorized-domain"** when using **Continue with Google**, add your live domain to Firebase:
+
+1. Open [Firebase Console](https://console.firebase.google.com/) → your project.
+2. Go to **Authentication** → **Settings** (or **Sign-in method** tab) → **Authorized domains**.
+3. Click **Add domain**.
+4. Enter your Vercel domain, e.g.:
+   - `your-project.vercel.app` (replace with your actual Vercel URL)
+   - or your custom domain if you use one (e.g. `app.philfida.gov.ph`).
+5. Save.
+
+Google sign-in will then work from that domain. Repeat for any other domains (e.g. preview URLs) if needed.
+
+## 6. Run the app
 
 ```bash
 npm run dev
