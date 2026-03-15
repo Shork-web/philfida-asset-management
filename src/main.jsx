@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import './index.css'
 import { AuthProvider } from './lib/AuthProvider'
 import { ProtectedRoute, PublicRoute } from './components/ProtectedRoute'
+import ErrorBoundary from './components/ErrorBoundary'
 import App from './App.jsx'
 import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
@@ -13,6 +14,7 @@ import Subscriptions from './pages/Subscriptions.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
+    <ErrorBoundary>
     <BrowserRouter>
       <AuthProvider>
         <Routes>
@@ -39,5 +41,6 @@ createRoot(document.getElementById('root')).render(
         </Routes>
       </AuthProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )

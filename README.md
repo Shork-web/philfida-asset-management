@@ -31,6 +31,21 @@ IT asset management system with Firebase Firestore as the database.
 
    Open `http://localhost:5173`. Add assets via the **Add Asset** button.
 
+## Deploying to Vercel
+
+1. Push your code to GitHub and import the repo in [Vercel](https://vercel.com).
+2. **Add environment variables** in the Vercel project (Settings → Environment Variables). Add the same names as in `.env`:
+   - `VITE_FIREBASE_API_KEY`
+   - `VITE_FIREBASE_AUTH_DOMAIN`
+   - `VITE_FIREBASE_PROJECT_ID`
+   - `VITE_FIREBASE_STORAGE_BUCKET`
+   - `VITE_FIREBASE_MESSAGING_SENDER_ID`
+   - `VITE_FIREBASE_APP_ID`
+   - `VITE_SIGNUP_MASTER_KEY` (optional, for email sign-up)
+3. Deploy. The project includes `vercel.json` so client-side routes work correctly.
+
+If you see a white screen, check the browser console for errors and ensure all Firebase env vars are set in Vercel, then redeploy.
+
 ## Pushing to GitHub
 
 See **[GITHUB_SETUP.md](./GITHUB_SETUP.md)** for step-by-step instructions to create a GitHub repo and push this project (including installing Git if needed).
