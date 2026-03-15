@@ -16,6 +16,7 @@ const secureOk = checkSecureContext()
 export default function ScanQR() {
   const [mode, setMode] = useState('idle')   // 'idle' | 'camera' | 'result'
   const [scanResult, setScanResult] = useState(null)
+  const [scanHistory, setScanHistory] = useState([])  // { oldPropertyNumber, newPropertyNumber, time }[]
   const [cameraError, setCameraError] = useState(null)
   const [uploadError, setUploadError] = useState(null)
   const [uploadLoading, setUploadLoading] = useState(false)
@@ -60,6 +61,10 @@ export default function ScanQR() {
         if (asset) {
           stopCamera()
           setScanResult(asset)
+          setScanHistory((prev) => [
+            { oldPropertyNumber: asset.assetTag ?? null, newPropertyNumber: asset.newPropertyNumber ?? null, time: new Date() },
+            ...prev,
+          ])
           setMode('result')
           return
         }
@@ -156,6 +161,10 @@ export default function ScanQR() {
         return
       }
       setScanResult(asset)
+      setScanHistory((prev) => [
+        { oldPropertyNumber: asset.assetTag ?? null, newPropertyNumber: asset.newPropertyNumber ?? null, time: new Date() },
+        ...prev,
+      ])
       setMode('result')
     } catch (err) {
       setUploadError(err?.message || 'Could not read the image. Try a clearer photo of the QR code.')
@@ -190,7 +199,7 @@ export default function ScanQR() {
       </header>
 
       <section className="scan-qr-section">
-
+        <div className="scan-qr-main">
         {/* ── Idle: choose camera or upload ── */}
         {mode === 'idle' && (
           <div className="scan-qr-start">
@@ -199,18 +208,32 @@ export default function ScanQR() {
                 ⚠ Camera requires <strong>https://</strong> or <strong>http://localhost</strong>.
               </p>
             )}
-            <p>Choose how to scan the asset QR code:</p>
+            <p className="scan-qr-start-heading">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h.01M14 17h3m3 0v3m-3-3v3m0-3h3"/>
+              </svg>
+              Choose scan method
+            </p>
+            <p>Select how you want to scan the asset QR code.</p>
             <div className="scan-qr-start-actions">
               {secureOk && (
                 <button type="button" className="scan-qr-mode-btn" onClick={openCamera}>
                   <span className="scan-qr-mode-icon">
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                       <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
                       <circle cx="12" cy="13" r="3" />
                     </svg>
                   </span>
-                  <span className="scan-qr-mode-label">Use camera</span>
-                  <span className="scan-qr-mode-sub">Live scan with device camera</span>
+                  <span className="scan-qr-mode-text">
+                    <span className="scan-qr-mode-label">Use camera</span>
+                    <span className="scan-qr-mode-sub">Live scan with device camera</span>
+                  </span>
+                  <span className="scan-qr-mode-arrow">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="m9 18 6-6-6-6"/>
+                    </svg>
+                  </span>
                 </button>
               )}
               <label className="scan-qr-mode-btn scan-qr-mode-upload">
@@ -226,15 +249,22 @@ export default function ScanQR() {
                   {uploadLoading
                     ? <span className="auth-spinner auth-spinner-dark" />
                     : (
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                         <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
                         <polyline points="17 8 12 3 7 8" />
                         <line x1="12" y1="3" x2="12" y2="15" />
                       </svg>
                     )}
                 </span>
-                <span className="scan-qr-mode-label">{uploadLoading ? 'Reading…' : 'Upload image'}</span>
-                <span className="scan-qr-mode-sub">Choose a QR code photo or screenshot</span>
+                <span className="scan-qr-mode-text">
+                  <span className="scan-qr-mode-label">{uploadLoading ? 'Reading…' : 'Upload image'}</span>
+                  <span className="scan-qr-mode-sub">Choose a QR code photo or screenshot</span>
+                </span>
+                <span className="scan-qr-mode-arrow">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="m9 18 6-6-6-6"/>
+                  </svg>
+                </span>
               </label>
             </div>
             {cameraError && <p className="scan-qr-error-msg">{cameraError}</p>}
@@ -348,6 +378,69 @@ export default function ScanQR() {
           </div>
         )}
 
+        </div>
+
+        {/* ── History panel: finished scans (Old & New property numbers only) ── */}
+        <aside className="scan-qr-history-panel">
+          <div className="scan-qr-history-head">
+            <div className="scan-qr-history-head-left">
+              <span className="scan-qr-history-icon">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/>
+                </svg>
+              </span>
+              <h2 className="scan-qr-history-title">Scan history</h2>
+              {scanHistory.length > 0 && (
+                <span className="scan-qr-history-count">{scanHistory.length}</span>
+              )}
+            </div>
+            {scanHistory.length > 0 && (
+              <button type="button" className="scan-qr-history-clear" onClick={() => setScanHistory([])}>
+                Clear all
+              </button>
+            )}
+          </div>
+          <div className="scan-qr-history-body">
+            {scanHistory.length === 0 ? (
+              <div className="scan-qr-history-empty">
+                <span className="scan-qr-history-empty-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                    <rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h.01M14 17h3m3 0v3m-3-3v3m0-3h3"/>
+                  </svg>
+                </span>
+                <span>No scans yet.<br/>Scan a QR to see history.</span>
+              </div>
+            ) : (
+              <ul className="scan-qr-history-list">
+                {scanHistory.map((entry, i) => (
+                  <li key={i} className="scan-qr-history-item">
+                    <div className="scan-qr-history-item-top">
+                      <span className="scan-qr-history-index">{scanHistory.length - i}</span>
+                      <span className="scan-qr-history-ts">
+                        {entry.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                    </div>
+                    <div className="scan-qr-history-fields">
+                      <div className="scan-qr-history-field">
+                        <span className="scan-qr-history-label">Old property no.</span>
+                        <span className={`scan-qr-history-value${!entry.oldPropertyNumber ? ' is-empty' : ''}`}>
+                          {entry.oldPropertyNumber || '—'}
+                        </span>
+                      </div>
+                      <div className="scan-qr-history-field">
+                        <span className="scan-qr-history-label">New property no.</span>
+                        <span className={`scan-qr-history-value${!entry.newPropertyNumber ? ' is-empty' : ''}`}>
+                          {entry.newPropertyNumber || '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </aside>
       </section>
     </>
   )

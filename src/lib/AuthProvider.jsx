@@ -20,10 +20,12 @@ export function AuthProvider({ children }) {
           try {
             const profile = await getUserProfile(firebaseUser.uid)
             if (!profile) {
-              console.warn('[Auth] No user profile found for', firebaseUser.uid, '— defaulting to region 7 / role admin.')
+              // No profile = account was deleted by admin. Sign out immediately.
+              await signOut(getFirebaseAuth())
+              return
             }
-            setUserRegion(profile?.region ?? '7')
-            setUserRole(profile?.role ?? 'admin')
+            setUserRegion(profile.region)
+            setUserRole(profile.role)
           } catch (profileErr) {
             console.error('[Auth] Failed to read user profile — Firestore /users rules may not be deployed.', profileErr?.message)
             setUserRegion('7')

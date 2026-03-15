@@ -12,6 +12,7 @@ import ServiceableAssets from './pages/ServiceableAssets.jsx'
 import UnserviceableAssets from './pages/UnserviceableAssets.jsx'
 import Subscriptions from './pages/Subscriptions.jsx'
 import ScanQR from './pages/ScanQR.jsx'
+import UserManagement from './pages/UserManagement.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -39,6 +40,7 @@ createRoot(document.getElementById('root')).render(
             <Route path="unserviceable" element={<UnserviceableAssets />} />
             <Route path="subscriptions" element={<Subscriptions />} />
             <Route path="scan" element={<ScanQR />} />
+            <Route path="users" element={<UserManagement />} />
           </Route>
         </Routes>
       </AuthProvider>

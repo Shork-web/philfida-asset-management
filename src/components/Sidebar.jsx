@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { IconDashboard, IconCheckCircle, IconAlertTriangle, IconChevronLeft, IconCreditCard, IconQrCode } from './Icons'
+import { IconDashboard, IconCheckCircle, IconAlertTriangle, IconChevronLeft, IconCreditCard, IconQrCode, IconUsers } from './Icons'
 import { useAuth } from '../lib/useAuth'
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
 import './Sidebar.css'
@@ -9,7 +9,8 @@ const NAV_ITEMS = [
   { to: '/serviceable', label: 'Serviceable Assets', icon: IconCheckCircle },
   { to: '/unserviceable', label: 'Unserviceable Assets', icon: IconAlertTriangle },
   { to: '/subscriptions', label: 'Subscriptions', icon: IconCreditCard },
-  { to: '/scan', label: 'Scan QR', icon: IconQrCode, adminOnly: true }, // regional admins + super admin (hidden from viewers)
+  { to: '/scan', label: 'Scan QR', icon: IconQrCode, adminOnly: true },
+  { to: '/users', label: 'User Management', icon: IconUsers, superAdminOnly: true },
 ]
 
 function regionLabel(userRegion) {
@@ -20,7 +21,7 @@ function regionLabel(userRegion) {
 export default function Sidebar({ collapsed, onToggle }) {
   const { userRegion, userRole } = useAuth()
   const isViewer = userRole === 'viewer'
-  // Scan QR: show for regional admins and super admin (any non-viewer)
+  const isSuperAdmin = userRegion === 'all'
   const canAccessScanQR = !isViewer
 
   return (
@@ -39,7 +40,11 @@ export default function Sidebar({ collapsed, onToggle }) {
       </div>
 
       <nav className="sidebar-nav">
-        {NAV_ITEMS.filter((item) => !item.adminOnly || canAccessScanQR).map((item) => (
+        {NAV_ITEMS.filter((item) => {
+          if (item.superAdminOnly) return isSuperAdmin
+          if (item.adminOnly) return canAccessScanQR
+          return true
+        }).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
