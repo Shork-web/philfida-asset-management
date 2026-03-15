@@ -2,10 +2,15 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import UserMenu from './components/UserMenu'
+import { useAuth } from './lib/useAuth'
+import { useInactivityLogout } from './lib/useInactivityLogout'
 import './App.css'
 
 export default function App() {
   const [collapsed, setCollapsed] = useState(false)
+  const { user, logout } = useAuth()
+
+  useInactivityLogout(logout, Boolean(user))
 
   return (
     <div className={`layout${collapsed ? ' sidebar-collapsed' : ''}`}>
