@@ -6,10 +6,12 @@ import {
   GoogleAuthProvider,
   sendPasswordResetEmail,
   updateProfile,
+  signOut,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '../lib/firebase'
-import { isSignUpEnabled, resolveRegionFromKey } from '../lib/regionKeys'
+import { isSignUpEnabled, resolveRegionFromKey, isSuperAdminKey } from '../lib/regionKeys'
 import { setUserProfile } from '../lib/userProfile'
+import { isSuperAdminKeyUsed, markSuperAdminKeyUsed } from '../lib/superAdmin'
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
 
 function validateEmail(value) {
@@ -225,6 +227,18 @@ export default function Login() {
         )
         return
       }
+      if (isSuperAdminKey(masterKey)) {
+        try {
+          const used = await isSuperAdminKeyUsed()
+          if (used) {
+            setError('The Super Admin key has already been used. It can only be used once.')
+            return
+          }
+        } catch {
+          setError('Could not verify Super Admin key. Try again.')
+          return
+        }
+      }
     }
     setGoogleLoading(true)
     try {
@@ -246,6 +260,15 @@ export default function Login() {
               'Signed in with Google, but your region could not be saved — the Firestore security rules may not be deployed yet. ' +
               'Ask your administrator to publish the rules in Firebase Console → Firestore → Rules, then sign up again.'
             )
+            return
+          }
+          if (isSuperAdminKey(masterKey)) {
+            const status = await markSuperAdminKeyUsed(result.user.uid)
+            if (status === 'already_used') {
+              await signOut(getFirebaseAuth())
+              setError('The Super Admin key has already been used. It can only be used once.')
+              return
+            }
           }
         }
       }
@@ -269,6 +292,18 @@ export default function Login() {
         )
         return
       }
+      if (isSuperAdminKey(masterKey)) {
+        try {
+          const used = await isSuperAdminKeyUsed()
+          if (used) {
+            setError('The Super Admin key has already been used. It can only be used once.')
+            return
+          }
+        } catch {
+          setError('Could not verify Super Admin key. Try again.')
+          return
+        }
+      }
       if (!isPasswordStrong(password)) { setError('Please meet all password requirements.'); return }
       if (password !== confirmPassword) { setError('Passwords do not match.'); return }
       if (!validateEmail(email)) { setError('Please enter a valid email address.'); return }
@@ -287,14 +322,20 @@ export default function Login() {
               email: cred.user.email ?? null,
             })
           } catch (profileErr) {
-            // Profile write failed – likely Firestore rules not yet deployed.
-            // Sign-up still succeeds but the user will default to region '7' until rules are live.
             console.error('Could not save user region profile:', profileErr?.message)
             setError(
               'Account created, but your region could not be saved — the Firestore security rules may not be deployed yet. ' +
               'Ask your administrator to publish the rules in Firebase Console → Firestore → Rules, then sign up again.'
             )
             return
+          }
+          if (isSuperAdminKey(masterKey)) {
+            const status = await markSuperAdminKeyUsed(cred.user.uid)
+            if (status === 'already_used') {
+              await signOut(getFirebaseAuth())
+              setError('The Super Admin key has already been used. It can only be used once.')
+              return
+            }
           }
         }
       } else {
