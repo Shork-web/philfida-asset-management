@@ -7,6 +7,7 @@ import { getUserProfile } from './userProfile'
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [userRegion, setUserRegion] = useState(null)
+  const [userRole, setUserRole] = useState(null)
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState(null)
 
@@ -18,23 +19,19 @@ export function AuthProvider({ children }) {
         if (firebaseUser) {
           try {
             const profile = await getUserProfile(firebaseUser.uid)
-            const region = profile?.region ?? '7'
             if (!profile) {
-              console.warn(
-                '[Auth] No user profile found for', firebaseUser.uid,
-                '— defaulting to region 7. If this is unexpected, check Firestore rules for the /users collection.'
-              )
+              console.warn('[Auth] No user profile found for', firebaseUser.uid, '— defaulting to region 7 / role admin.')
             }
-            setUserRegion(region)
+            setUserRegion(profile?.region ?? '7')
+            setUserRole(profile?.role ?? 'admin')
           } catch (profileErr) {
-            console.error(
-              '[Auth] Failed to read user profile — Firestore /users rules may not be deployed.',
-              profileErr?.message
-            )
+            console.error('[Auth] Failed to read user profile — Firestore /users rules may not be deployed.', profileErr?.message)
             setUserRegion('7')
+            setUserRole('admin')
           }
         } else {
           setUserRegion(null)
+          setUserRole(null)
         }
         setLoading(false)
       })
@@ -98,7 +95,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, userRegion, loading, logout }}>
+    <AuthContext.Provider value={{ user, userRegion, userRole, loading, logout }}>
       {children}
     </AuthContext.Provider>
   )

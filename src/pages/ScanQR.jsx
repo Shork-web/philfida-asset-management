@@ -1,0 +1,354 @@
+import { useCallback, useEffect, useRef, useState } from 'react'
+import jsQR from 'jsqr'
+import { parseAssetQRPayload } from '../lib/assetQRPayload'
+import { TYPE_LABELS, formatPHP } from '../lib/constants'
+import StatusBadge from '../components/StatusBadge'
+
+function checkSecureContext() {
+  if (typeof window === 'undefined') return false
+  if (window.isSecureContext) return true
+  const host = window.location?.hostname || ''
+  return host === 'localhost' || host === '127.0.0.1' || host === ''
+}
+
+const secureOk = checkSecureContext()
+
+export default function ScanQR() {
+  const [mode, setMode] = useState('idle')   // 'idle' | 'camera' | 'result'
+  const [scanResult, setScanResult] = useState(null)
+  const [cameraError, setCameraError] = useState(null)
+  const [uploadError, setUploadError] = useState(null)
+  const [uploadLoading, setUploadLoading] = useState(false)
+
+  const videoRef = useRef(null)
+  const canvasRef = useRef(null)
+  const streamRef = useRef(null)
+  const rafRef = useRef(null)
+  const fileInputRef = useRef(null)
+  const activeRef = useRef(false)  // prevents stale RAF callbacks after stop
+
+  // ── Stop camera completely ───────────────────────────────────────────
+  const stopCamera = useCallback(() => {
+    activeRef.current = false
+    if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop())
+      streamRef.current = null
+    }
+    if (videoRef.current) videoRef.current.srcObject = null
+  }, [])
+
+  // ── RAF scan loop — runs after video is playing ─────────────────────
+  const scanLoop = useCallback(() => {
+    if (!activeRef.current) return
+    const video = videoRef.current
+    const canvas = canvasRef.current
+    if (!video || !canvas) { rafRef.current = requestAnimationFrame(scanLoop); return }
+
+    // Only scan when video has real pixels
+    if (video.readyState === 4 && video.videoWidth > 0) {
+      canvas.width = video.videoWidth
+      canvas.height = video.videoHeight
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      ctx.drawImage(video, 0, 0)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'attemptBoth',
+      })
+      if (code?.data) {
+        const asset = parseAssetQRPayload(code.data)
+        if (asset) {
+          stopCamera()
+          setScanResult(asset)
+          setMode('result')
+          return
+        }
+      }
+    }
+    rafRef.current = requestAnimationFrame(scanLoop)
+  }, [stopCamera])
+
+  // ── Start the camera AFTER the video element is in the DOM ──────────
+  // This useEffect runs whenever mode becomes 'camera', by which point
+  // the <video> ref is already attached.
+  useEffect(() => {
+    if (mode !== 'camera') return
+    let cancelled = false
+
+    const init = async () => {
+      try {
+        let stream
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+          })
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true })
+        }
+        if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
+        streamRef.current = stream
+
+        const video = videoRef.current
+        if (!video) { stream.getTracks().forEach((t) => t.stop()); return }
+        video.srcObject = stream
+
+        // Wait for video metadata so dimensions are known
+        await new Promise((resolve, reject) => {
+          video.onloadedmetadata = resolve
+          video.onerror = reject
+        })
+        if (cancelled) return
+
+        await video.play()
+        if (cancelled) return
+
+        activeRef.current = true
+        rafRef.current = requestAnimationFrame(scanLoop)
+      } catch (err) {
+        if (cancelled) return
+        const msg = err?.message || ''
+        setCameraError(
+          msg.toLowerCase().includes('permission') || msg.toLowerCase().includes('denied')
+            ? 'Camera permission denied. Allow camera access in your browser and try again.'
+            : msg || 'Could not start camera. Allow camera access and try again.'
+        )
+        setMode('idle')
+      }
+    }
+
+    init()
+
+    return () => {
+      cancelled = true
+      stopCamera()
+    }
+  }, [mode, scanLoop, stopCamera])
+
+  // Cleanup on unmount
+  useEffect(() => () => stopCamera(), [stopCamera])
+
+  // ── File upload ─────────────────────────────────────────────────────
+  const handleFileUpload = async (e) => {
+    const file = e?.target?.files?.[0]
+    if (!file) return
+    if (fileInputRef.current) fileInputRef.current.value = ''
+    setUploadError(null)
+    setScanResult(null)
+    setUploadLoading(true)
+    try {
+      const bitmap = await createImageBitmap(file)
+      const canvas = document.createElement('canvas')
+      canvas.width = bitmap.width
+      canvas.height = bitmap.height
+      const ctx = canvas.getContext('2d', { willReadFrequently: true })
+      ctx.drawImage(bitmap, 0, 0)
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
+      const code = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'attemptBoth',
+      })
+      if (!code?.data) {
+        setUploadError('No QR code found in this image. Make sure the full QR code is clearly visible.')
+        return
+      }
+      const asset = parseAssetQRPayload(code.data)
+      if (!asset) {
+        setUploadError('QR code found but it is not a PhilFIDA asset QR. Use a QR generated by this system.')
+        return
+      }
+      setScanResult(asset)
+      setMode('result')
+    } catch (err) {
+      setUploadError(err?.message || 'Could not read the image. Try a clearer photo of the QR code.')
+    } finally {
+      setUploadLoading(false)
+    }
+  }
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+  const openCamera = () => {
+    setCameraError(null)
+    setUploadError(null)
+    setScanResult(null)
+    setMode('camera')   // renders <video>; useEffect above fires the stream
+  }
+
+  const reset = () => {
+    stopCamera()
+    setScanResult(null)
+    setCameraError(null)
+    setUploadError(null)
+    setMode('idle')
+  }
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <h1>Scan QR</h1>
+          <p>Point your camera at an asset QR code or upload an image to view asset details.</p>
+        </div>
+      </header>
+
+      <section className="scan-qr-section">
+
+        {/* ── Idle: choose camera or upload ── */}
+        {mode === 'idle' && (
+          <div className="scan-qr-start">
+            {!secureOk && (
+              <p className="scan-qr-insecure">
+                ⚠ Camera requires <strong>https://</strong> or <strong>http://localhost</strong>.
+              </p>
+            )}
+            <p>Choose how to scan the asset QR code:</p>
+            <div className="scan-qr-start-actions">
+              {secureOk && (
+                <button type="button" className="scan-qr-mode-btn" onClick={openCamera}>
+                  <span className="scan-qr-mode-icon">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+                      <circle cx="12" cy="13" r="3" />
+                    </svg>
+                  </span>
+                  <span className="scan-qr-mode-label">Use camera</span>
+                  <span className="scan-qr-mode-sub">Live scan with device camera</span>
+                </button>
+              )}
+              <label className="scan-qr-mode-btn scan-qr-mode-upload">
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={handleFileUpload}
+                  className="scan-qr-file-input"
+                  disabled={uploadLoading}
+                />
+                <span className="scan-qr-mode-icon">
+                  {uploadLoading
+                    ? <span className="auth-spinner auth-spinner-dark" />
+                    : (
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="17 8 12 3 7 8" />
+                        <line x1="12" y1="3" x2="12" y2="15" />
+                      </svg>
+                    )}
+                </span>
+                <span className="scan-qr-mode-label">{uploadLoading ? 'Reading…' : 'Upload image'}</span>
+                <span className="scan-qr-mode-sub">Choose a QR code photo or screenshot</span>
+              </label>
+            </div>
+            {cameraError && <p className="scan-qr-error-msg">{cameraError}</p>}
+            {uploadError && <p className="scan-qr-error-msg">{uploadError}</p>}
+          </div>
+        )}
+
+        {/* ── Camera live view — always in DOM when mode='camera' ── */}
+        {mode === 'camera' && (
+          <div className="scan-qr-camera-section">
+            <div className="scan-qr-camera-wrap">
+              <video
+                ref={videoRef}
+                className="scan-qr-video"
+                playsInline
+                muted
+                autoPlay
+              />
+              <canvas ref={canvasRef} className="scan-qr-canvas-hidden" />
+              <div className="scan-qr-viewfinder">
+                <div className="scan-qr-viewfinder-box" />
+              </div>
+              <p className="scan-qr-camera-hint">Centre the QR code inside the frame</p>
+            </div>
+            <button type="button" className="btn btn-ghost" onClick={reset} style={{ marginTop: '0.75rem' }}>
+              Cancel
+            </button>
+          </div>
+        )}
+
+        {/* ── Result ── */}
+        {mode === 'result' && scanResult && (
+          <div className="scan-qr-result">
+            <div className="scan-qr-result-card">
+              <div className="scan-qr-result-header">
+                <span className="scan-qr-result-icon">
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <path d="m9 11 3 3L22 4" />
+                  </svg>
+                </span>
+                <div>
+                  <h2 className="scan-qr-result-title">Scanned successfully</h2>
+                  <p className="scan-qr-result-subtitle">Information from QR code</p>
+                </div>
+              </div>
+
+              <div className="scan-qr-result-hero">
+                <div className="scan-qr-result-name">{scanResult.name || 'Unnamed asset'}</div>
+                <div className="scan-qr-result-ids">
+                  {scanResult.assetTag && (
+                    <span className="scan-qr-result-id"><strong>Old #</strong> {scanResult.assetTag}</span>
+                  )}
+                  {scanResult.newPropertyNumber && (
+                    <span className="scan-qr-result-id"><strong>New #</strong> {scanResult.newPropertyNumber}</span>
+                  )}
+                </div>
+              </div>
+
+              <div className="scan-qr-result-sections">
+                <section className="scan-qr-result-section">
+                  <h3>Identification</h3>
+                  <dl className="scan-qr-result-dl">
+                    {scanResult.serialNumber && <div><dt>Serial number</dt><dd>{scanResult.serialNumber}</dd></div>}
+                    <div><dt>Type</dt><dd>{TYPE_LABELS[scanResult.type] || scanResult.type || '—'}</dd></div>
+                    {scanResult.subtype && <div><dt>Subtype</dt><dd>{scanResult.subtype}</dd></div>}
+                    <div><dt>Status</dt><dd><StatusBadge status={scanResult.status} /></dd></div>
+                  </dl>
+                </section>
+
+                <section className="scan-qr-result-section">
+                  <h3>Assignment & location</h3>
+                  <dl className="scan-qr-result-dl">
+                    <div><dt>Issued to</dt><dd>{scanResult.issuedTo || '—'}</dd></div>
+                    <div><dt>Location</dt><dd>{scanResult.location || '—'}</dd></div>
+                    <div><dt>Region</dt><dd>{scanResult.region ? `Region ${scanResult.region}` : '—'}</dd></div>
+                  </dl>
+                </section>
+
+                <section className="scan-qr-result-section">
+                  <h3>Acquisition & value</h3>
+                  <dl className="scan-qr-result-dl">
+                    <div><dt>Year of acquisition</dt><dd>{scanResult.yearOfAcquisition || '—'}</dd></div>
+                    <div><dt>Total value</dt><dd className="scan-qr-result-value">{formatPHP(scanResult.value)}</dd></div>
+                    {scanResult.quantityPerPropertyCard != null && (
+                      <div><dt>Qty (property card)</dt><dd>{scanResult.quantityPerPropertyCard}</dd></div>
+                    )}
+                    {scanResult.quantityPerPhysicalCount != null && (
+                      <div><dt>Qty (physical count)</dt><dd>{scanResult.quantityPerPhysicalCount}</dd></div>
+                    )}
+                  </dl>
+                </section>
+              </div>
+
+              {scanResult.notes && (
+                <div className="scan-qr-result-notes">
+                  <h3>Notes</h3>
+                  <p>{scanResult.notes}</p>
+                </div>
+              )}
+
+              <div className="scan-qr-result-actions">
+                <button type="button" className="btn btn-primary" onClick={openCamera}>
+                  Scan another with camera
+                </button>
+                <button type="button" className="btn btn-ghost" onClick={reset}>
+                  Back
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+      </section>
+    </>
+  )
+}

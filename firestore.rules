@@ -8,6 +8,16 @@ service cloud.firestore {
         : 'all';
     }
 
+    function getUserRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', 'admin')
+        : 'admin';
+    }
+
+    function isViewer() {
+      return getUserRole() == 'viewer';
+    }
+
     match /config/signup {
       allow read: if true;
       allow create: if request.auth != null;
@@ -21,18 +31,18 @@ service cloud.firestore {
     match /assets/{assetId} {
       allow read: if request.auth != null &&
         (getUserRegion() == 'all' || resource.data.region == getUserRegion());
-      allow create: if request.auth != null &&
+      allow create: if request.auth != null && !isViewer() &&
         (getUserRegion() == 'all' || request.resource.data.region == getUserRegion());
-      allow update, delete: if request.auth != null &&
+      allow update, delete: if request.auth != null && !isViewer() &&
         (getUserRegion() == 'all' || resource.data.region == getUserRegion());
     }
 
     match /subscriptions/{subscriptionId} {
       allow read: if request.auth != null &&
         (getUserRegion() == 'all' || resource.data.region == getUserRegion());
-      allow create: if request.auth != null &&
+      allow create: if request.auth != null && !isViewer() &&
         (getUserRegion() == 'all' || request.resource.data.region == getUserRegion());
-      allow update, delete: if request.auth != null &&
+      allow update, delete: if request.auth != null && !isViewer() &&
         (getUserRegion() == 'all' || resource.data.region == getUserRegion());
     }
 

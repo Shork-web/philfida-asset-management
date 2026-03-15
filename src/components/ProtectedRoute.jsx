@@ -2,9 +2,9 @@ import { Navigate } from 'react-router-dom'
 import { useAuth } from '../lib/useAuth'
 
 export function ProtectedRoute({ children }) {
-  const { user, userRegion, loading } = useAuth()
-  // Wait until both auth AND region profile are resolved before rendering
-  if (loading || (user && userRegion === null)) return <div className="auth-loading">Loading...</div>
+  const { user, userRegion, userRole, loading } = useAuth()
+  // Wait until auth AND profile (region + role) are resolved before rendering
+  if (loading || (user && (userRegion === null || userRole === null))) return <div className="auth-loading">Loading...</div>
   return user ? children : <Navigate to="/login" replace />
 }
 

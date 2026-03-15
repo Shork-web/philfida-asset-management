@@ -146,3 +146,15 @@ export function IconRepeat() {
     </svg>
   )
 }
+
+export function IconQrCode() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3" y="3" width="7" height="7" />
+      <rect x="14" y="3" width="7" height="7" />
+      <path d="M3 14h2" /><path d="M8 14h1" /><path d="M14 14h2" /><path d="M20 14h1" />
+      <path d="M3 17h1" /><path d="M6 17h2" /><path d="M10 17h1" /><path d="M14 17h2" /><path d="M18 17h1" /><path d="M21 17h1" />
+      <path d="M3 20h2" /><path d="M8 20h1" /><path d="M14 20h2" /><path d="M20 20h1" />
+    </svg>
+  )
+}

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { IconDashboard, IconCheckCircle, IconAlertTriangle, IconChevronLeft, IconCreditCard } from './Icons'
+import { IconDashboard, IconCheckCircle, IconAlertTriangle, IconChevronLeft, IconCreditCard, IconQrCode } from './Icons'
 import { useAuth } from '../lib/useAuth'
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
 import './Sidebar.css'
@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { to: '/serviceable', label: 'Serviceable Assets', icon: IconCheckCircle },
   { to: '/unserviceable', label: 'Unserviceable Assets', icon: IconAlertTriangle },
   { to: '/subscriptions', label: 'Subscriptions', icon: IconCreditCard },
+  { to: '/scan', label: 'Scan QR', icon: IconQrCode, adminOnly: true }, // regional admins + super admin (hidden from viewers)
 ]
 
 function regionLabel(userRegion) {
@@ -17,7 +18,10 @@ function regionLabel(userRegion) {
 }
 
 export default function Sidebar({ collapsed, onToggle }) {
-  const { userRegion } = useAuth()
+  const { userRegion, userRole } = useAuth()
+  const isViewer = userRole === 'viewer'
+  // Scan QR: show for regional admins and super admin (any non-viewer)
+  const canAccessScanQR = !isViewer
 
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
@@ -27,12 +31,15 @@ export default function Sidebar({ collapsed, onToggle }) {
           <div className="sidebar-brand-text">
             <span className="sidebar-title">PhilFIDA</span>
             <span className="sidebar-region">{regionLabel(userRegion)}</span>
+            {isViewer && (
+              <span className="sidebar-viewer-badge">View Only</span>
+            )}
           </div>
         )}
       </div>
 
       <nav className="sidebar-nav">
-        {NAV_ITEMS.map((item) => (
+        {NAV_ITEMS.filter((item) => !item.adminOnly || canAccessScanQR).map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
@@ -47,7 +54,7 @@ export default function Sidebar({ collapsed, onToggle }) {
       </nav>
 
       <div className="sidebar-footer">
-        {!collapsed && <span>PhilFIDA Asset Management V1.5</span>}
+        {!collapsed && <span>PhilFIDA Asset Management By: PDO R7</span>}
         <button
           className={`sidebar-toggle${collapsed ? ' rotated' : ''}`}
           onClick={onToggle}

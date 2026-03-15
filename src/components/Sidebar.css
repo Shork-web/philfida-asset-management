@@ -65,6 +65,20 @@
   text-transform: uppercase;
 }
 
+.sidebar-viewer-badge {
+  display: inline-block;
+  margin-top: 3px;
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
 /* ── Nav ── */
 .sidebar-nav {
   flex: 1;

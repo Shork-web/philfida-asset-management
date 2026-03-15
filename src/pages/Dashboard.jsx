@@ -11,7 +11,8 @@ import { IconPlus, IconRefresh, IconDownload } from '../components/Icons'
 import { exportAssetsToExcel } from '../lib/exportExcel'
 
 export default function Dashboard() {
-  const { userRegion } = useAuth() || {}
+  const { userRegion, userRole } = useAuth() || {}
+  const isViewer = userRole === 'viewer'
   const [assets, setAssets] = useState([])
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState(null)
@@ -62,9 +63,11 @@ export default function Dashboard() {
             )}
           </p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          <IconPlus /> Add Asset
-        </button>
+        {!isViewer && (
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            <IconPlus /> Add Asset
+          </button>
+        )}
       </header>
 
       <section className="stats">
@@ -143,12 +146,13 @@ export default function Dashboard() {
           onEdit={setEditingAsset}
           onDelete={setDeletingAsset}
           emptyMessage='No assets yet. Click "Add Asset" to create one.'
+          readonly={isViewer}
         />
       </section>
 
-      {showForm && <AssetFormModal asset={null} userRegion={userRegion} onClose={() => setShowForm(false)} onSaved={load} toast={toast} />}
-      {editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
-      {deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
+      {!isViewer && showForm && <AssetFormModal asset={null} userRegion={userRegion} onClose={() => setShowForm(false)} onSaved={load} toast={toast} />}
+      {!isViewer && editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
+      {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
       <ToastContainer toasts={toasts} />
     </>
   )

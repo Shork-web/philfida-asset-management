@@ -4,7 +4,8 @@ import { useAuth } from '../lib/useAuth'
 import { IconUser, IconLogout } from './Icons'
 
 export default function UserMenu() {
-  const { user, userRegion, logout } = useAuth()
+  const { user, userRegion, userRole, logout } = useAuth()
+  const isViewer = userRole === 'viewer'
   const [open, setOpen] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const menuRef = useRef(null)
@@ -54,9 +55,12 @@ export default function UserMenu() {
             <div className="user-menu-info">
               <span className="user-menu-name">{user?.displayName || 'User'}</span>
               <span className="user-menu-email">{user?.email}</span>
-              {userRegion && userRegion !== 'all' && (
-                <span className="user-menu-region" title="Your data scope">Region {userRegion}</span>
-              )}
+              {isViewer
+                ? <span className="user-menu-region user-menu-viewer" title="View Only access">👁 View Only</span>
+                : userRegion && userRegion !== 'all' && (
+                  <span className="user-menu-region" title="Your data scope">Region {userRegion}</span>
+                )
+              }
             </div>
             <div className="user-menu-divider" />
             <button className="user-menu-item" onClick={handleSignOut} type="button">

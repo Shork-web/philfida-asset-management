@@ -11,7 +11,8 @@ import { IconRefresh, IconDownload } from '../components/Icons'
 import { exportAssetsToExcel } from '../lib/exportExcel'
 
 export default function UnserviceableAssets() {
-  const { userRegion } = useAuth() || {}
+  const { userRegion, userRole } = useAuth() || {}
+  const isViewer = userRole === 'viewer'
   const [allAssets, setAllAssets] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingAsset, setEditingAsset] = useState(null)
@@ -80,11 +81,12 @@ export default function UnserviceableAssets() {
           onEdit={setEditingAsset}
           onDelete={setDeletingAsset}
           emptyMessage="No unserviceable assets found."
+          readonly={isViewer}
         />
       </section>
 
-      {editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
-      {deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
+      {!isViewer && editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
+      {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
       <ToastContainer toasts={toasts} />
     </>
   )

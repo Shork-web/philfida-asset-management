@@ -1,7 +1,14 @@
 import { useMemo, useState } from 'react'
 import { TYPE_OPTIONS, TYPE_LABELS, STATUS_OPTIONS, STATUS_LABELS, formatPHP } from '../lib/constants'
 import StatusBadge from './StatusBadge'
-import { IconEye, IconEdit, IconTrash, IconX } from './Icons'
+import { IconEye, IconEdit, IconTrash, IconX, IconQrCode } from './Icons'
+import AssetQRModal from './AssetQRModal'
+
+const CURRENT_YEAR = new Date().getFullYear()
+function isForReplacement(yearOfAcquisition) {
+  if (!yearOfAcquisition) return false
+  return (CURRENT_YEAR - Number(yearOfAcquisition)) >= 5
+}
 
 const SORT_FIELDS = [
   { key: 'assetTag', label: 'Old Property Number' },
@@ -41,8 +48,9 @@ function IconSortDesc() {
   )
 }
 
-export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMessage, hideStatusFilter }) {
+export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMessage, hideStatusFilter, readonly }) {
   const [viewingAsset, setViewingAsset] = useState(null)
+  const [qrAsset, setQrAsset] = useState(null)
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -207,7 +215,7 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
               <th className="sortable-th" onClick={() => toggleSort('value')}>
                 Total Value {sortField === 'value' && (sortDir === 'asc' ? <IconSortAsc /> : <IconSortDesc />)}
               </th>
-              <th style={{ width: 100 }}>Actions</th>
+              <th style={{ width: readonly ? 90 : 130 }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -218,8 +226,10 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
                 </td>
               </tr>
             )}
-            {filtered.map((asset) => (
-              <tr key={asset.id}>
+            {filtered.map((asset) => {
+              const forReplacement = isForReplacement(asset.yearOfAcquisition)
+              return (
+              <tr key={asset.id} className={forReplacement ? 'row-for-replacement' : ''}>
                 <td><strong style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{asset.assetTag}</strong></td>
                 <td>
                   {asset.newPropertyNumber
@@ -229,6 +239,7 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
                 <td>
                   <span className="asset-name">{asset.name}</span>
                   {asset.serialNumber && <><br /><span className="asset-serial">S/N: {asset.serialNumber}</span></>}
+                  {forReplacement && <><br /><span className="replacement-badge">⚠ For Replacement</span></>}
                 </td>
                 <td>
                   <span>{TYPE_LABELS[asset.type] || asset.type}</span>
@@ -243,16 +254,23 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
                     <button className="btn-icon" title="View details" onClick={() => setViewingAsset(asset)}>
                       <IconEye />
                     </button>
-                    <button className="btn-icon" title="Edit" onClick={() => onEdit(asset)}>
-                      <IconEdit />
+                    <button className="btn-icon" title="QR Code" onClick={() => setQrAsset(asset)}>
+                      <IconQrCode />
                     </button>
-                    <button className="btn-icon danger" title="Delete" onClick={() => onDelete(asset)}>
-                      <IconTrash />
-                    </button>
+                    {!readonly && (
+                      <>
+                        <button className="btn-icon" title="Edit" onClick={() => onEdit(asset)}>
+                          <IconEdit />
+                        </button>
+                        <button className="btn-icon danger" title="Delete" onClick={() => onDelete(asset)}>
+                          <IconTrash />
+                        </button>
+                      </>
+                    )}
                   </div>
                 </td>
               </tr>
-            ))}
+            )})}
           </tbody>
         </table>
       </div>
@@ -262,6 +280,9 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
           <div className="modal asset-detail-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>Asset Details</h3>
+              {isForReplacement(viewingAsset.yearOfAcquisition) && (
+                <span className="replacement-badge-lg">⚠ For Replacement</span>
+              )}
               <button className="btn-icon" onClick={() => setViewingAsset(null)} type="button"><IconX /></button>
             </div>
             <div className="modal-body">
@@ -296,7 +317,11 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Year of Acquisition</span>
-                  <span className="detail-value">{viewingAsset.yearOfAcquisition || <span className="text-muted">N/A</span>}</span>
+                  <span className="detail-value">
+                    {viewingAsset.yearOfAcquisition
+                      ? <>{viewingAsset.yearOfAcquisition} <span style={{ color: 'var(--color-gray-400)', fontSize: '0.8rem' }}>({CURRENT_YEAR - Number(viewingAsset.yearOfAcquisition)} yr{CURRENT_YEAR - Number(viewingAsset.yearOfAcquisition) !== 1 ? 's' : ''} ago)</span></>
+                      : <span className="text-muted">N/A</span>}
+                  </span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Issued To</span>
@@ -328,16 +353,25 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-ghost" onClick={() => setViewingAsset(null)}>Close</button>
-              <button
-                type="button"
-                className="btn btn-primary"
-                onClick={() => { setViewingAsset(null); onEdit(viewingAsset); }}
-              >
-                <IconEdit /> Edit Asset
+              <button type="button" className="btn btn-ghost" onClick={() => setQrAsset(viewingAsset)}>
+                <IconQrCode /> QR Code
               </button>
+              {!readonly && (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  onClick={() => { setViewingAsset(null); onEdit(viewingAsset); }}
+                >
+                  <IconEdit /> Edit Asset
+                </button>
+              )}
             </div>
           </div>
         </div>
+      )}
+
+      {qrAsset && (
+        <AssetQRModal asset={qrAsset} onClose={() => setQrAsset(null)} />
       )}
     </>
   )

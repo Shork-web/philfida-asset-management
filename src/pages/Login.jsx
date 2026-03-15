@@ -9,9 +9,9 @@ import {
   signOut,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '../lib/firebase'
-import { isSignUpEnabled, resolveRegionFromKey, isSuperAdminKey } from '../lib/regionKeys'
+import { isSignUpEnabled, isViewerSignupEnabled, resolveRegionFromKey, resolveRegionFromViewerKey } from '../lib/regionKeys'
 import { setUserProfile } from '../lib/userProfile'
-import { isSuperAdminKeyUsed, markSuperAdminKeyUsed } from '../lib/superAdmin'
+
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
 
 function validateEmail(value) {
@@ -179,6 +179,9 @@ export default function Login() {
   const [displayName, setDisplayName] = useState('')
   const [masterKey, setMasterKey] = useState('')
   const [showMasterKey, setShowMasterKey] = useState(false)
+  const [isViewerMode, setIsViewerMode] = useState(false)
+  const [viewerKey, setViewerKey] = useState('')
+  const [showViewerKey, setShowViewerKey] = useState(false)
   const [resetEmail, setResetEmail] = useState('')
 
   const [passwordFocused, setPasswordFocused] = useState(false)
@@ -191,6 +194,7 @@ export default function Login() {
 
   const isSignUp = tab === 'signup'
   const signUpAllowed = isSignUpEnabled()
+  const VIEWER_SIGNUP_ENABLED = isViewerSignupEnabled()
   const passwordStrength = useMemo(() => getPasswordStrength(password), [password])
   const score = useMemo(() => strengthScore(passwordStrength), [passwordStrength])
   const passwordsMatch = !confirmPassword || password === confirmPassword
@@ -202,6 +206,9 @@ export default function Login() {
     setSuccess('')
     setMasterKey('')
     setShowMasterKey(false)
+    setIsViewerMode(false)
+    setViewerKey('')
+    setShowViewerKey(false)
     setConfirmPassword('')
     setShowPassword(false)
     setShowConfirmPassword(false)
@@ -218,24 +225,18 @@ export default function Login() {
 
   const onGoogleSignIn = async () => {
     setError('')
-    if (isSignUp && signUpAllowed) {
-      const region = resolveRegionFromKey(masterKey)
-      if (!region) {
-        setError(
-          'Enter a valid master key for your region (e.g. PhilFIDA1, PhilFIDA7). ' +
-          'Check for typos and restart the app if you recently changed .env.'
-        )
-        return
-      }
-      if (isSuperAdminKey(masterKey)) {
-        try {
-          const used = await isSuperAdminKeyUsed()
-          if (used) {
-            setError('The Super Admin key has already been used. It can only be used once.')
-            return
-          }
-        } catch {
-          setError('Could not verify Super Admin key. Try again.')
+    if (isSignUp) {
+      if (isViewerMode) {
+        if (!VIEWER_SIGNUP_ENABLED) { setError('Viewer sign-up is not enabled. Contact your administrator.'); return }
+        if (!resolveRegionFromViewerKey(viewerKey)) {
+          setError('Enter a valid viewer key for your region (e.g. ViewFIDA7).')
+          return
+        }
+      } else {
+        if (!signUpAllowed) { setError('Sign-up is not configured. Contact your administrator.'); return }
+        const region = resolveRegionFromKey(masterKey)
+        if (!region) {
+          setError('Enter a valid master key for your region (e.g. PhilFIDA1, PhilFIDA7).')
           return
         }
       }
@@ -245,28 +246,33 @@ export default function Login() {
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
       const result = await signInWithPopup(getFirebaseAuth(), provider)
-      if (isSignUp && signUpAllowed && result?.user) {
-        const region = resolveRegionFromKey(masterKey)
-        if (region) {
+      if (isSignUp && result?.user) {
+        if (isViewerMode) {
+          const viewerRegion = resolveRegionFromViewerKey(viewerKey)
           try {
             await setUserProfile(result.user.uid, {
-              region,
+              region: viewerRegion,
+              role: 'viewer',
               displayName: result.user.displayName ?? null,
               email: result.user.email ?? null,
             })
-          } catch (profileErr) {
-            console.error('Could not save user region profile:', profileErr?.message)
-            setError(
-              'Signed in with Google, but your region could not be saved — the Firestore security rules may not be deployed yet. ' +
-              'Ask your administrator to publish the rules in Firebase Console → Firestore → Rules, then sign up again.'
-            )
-            return
+          } catch (err) {
+            console.error('Could not save viewer profile:', err?.message)
+            setError('Signed in with Google, but your profile could not be saved. Check Firestore rules.')
           }
-          if (isSuperAdminKey(masterKey)) {
-            const status = await markSuperAdminKeyUsed(result.user.uid)
-            if (status === 'already_used') {
-              await signOut(getFirebaseAuth())
-              setError('The Super Admin key has already been used. It can only be used once.')
+        } else {
+          const region = resolveRegionFromKey(masterKey)
+          if (region) {
+            try {
+              await setUserProfile(result.user.uid, {
+                region,
+                role: 'admin',
+                displayName: result.user.displayName ?? null,
+                email: result.user.email ?? null,
+              })
+            } catch (profileErr) {
+              console.error('Could not save user region profile:', profileErr?.message)
+              setError('Signed in with Google, but your region could not be saved — Firestore rules may not be deployed yet.')
               return
             }
           }
@@ -283,24 +289,17 @@ export default function Login() {
     e.preventDefault()
     setError('')
     if (isSignUp) {
-      if (!signUpAllowed) { setError('Sign-up is not configured. Contact your administrator.'); return }
-      const region = resolveRegionFromKey(masterKey)
-      if (!region) {
-        setError(
-          'Invalid master key for your region. Use the key for your region (e.g. PhilFIDA1, PhilFIDA7). ' +
-          'Check for typos and restart the app if you recently changed .env.'
-        )
-        return
-      }
-      if (isSuperAdminKey(masterKey)) {
-        try {
-          const used = await isSuperAdminKeyUsed()
-          if (used) {
-            setError('The Super Admin key has already been used. It can only be used once.')
-            return
-          }
-        } catch {
-          setError('Could not verify Super Admin key. Try again.')
+      if (isViewerMode) {
+        if (!VIEWER_SIGNUP_ENABLED) { setError('Viewer sign-up is not enabled. Contact your administrator.'); return }
+        if (!resolveRegionFromViewerKey(viewerKey)) {
+          setError('Enter a valid viewer key for your region (e.g. ViewFIDA7).')
+          return
+        }
+      } else {
+        if (!signUpAllowed) { setError('Sign-up is not configured. Contact your administrator.'); return }
+        const region = resolveRegionFromKey(masterKey)
+        if (!region) {
+          setError('Invalid master key. Use the key for your region (e.g. PhilFIDA1, PhilFIDA7).')
           return
         }
       }
@@ -311,29 +310,35 @@ export default function Login() {
     setLoading(true)
     try {
       if (isSignUp) {
-        const region = resolveRegionFromKey(masterKey)
         const cred = await createUserWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
         if (displayName.trim()) await updateProfile(cred.user, { displayName: displayName.trim() })
-        if (region) {
+        if (isViewerMode) {
+          const viewerRegion = resolveRegionFromViewerKey(viewerKey)
           try {
             await setUserProfile(cred.user.uid, {
-              region,
+              region: viewerRegion,
+              role: 'viewer',
               displayName: displayName.trim() || null,
               email: cred.user.email ?? null,
             })
           } catch (profileErr) {
-            console.error('Could not save user region profile:', profileErr?.message)
-            setError(
-              'Account created, but your region could not be saved — the Firestore security rules may not be deployed yet. ' +
-              'Ask your administrator to publish the rules in Firebase Console → Firestore → Rules, then sign up again.'
-            )
+            console.error('Could not save viewer profile:', profileErr?.message)
+            setError('Account created, but your profile could not be saved — Firestore rules may not be deployed yet.')
             return
           }
-          if (isSuperAdminKey(masterKey)) {
-            const status = await markSuperAdminKeyUsed(cred.user.uid)
-            if (status === 'already_used') {
-              await signOut(getFirebaseAuth())
-              setError('The Super Admin key has already been used. It can only be used once.')
+        } else {
+          const region = resolveRegionFromKey(masterKey)
+          if (region) {
+            try {
+              await setUserProfile(cred.user.uid, {
+                region,
+                role: 'admin',
+                displayName: displayName.trim() || null,
+                email: cred.user.email ?? null,
+              })
+            } catch (profileErr) {
+              console.error('Could not save user region profile:', profileErr?.message)
+              setError('Account created, but your region could not be saved — Firestore rules may not be deployed yet.')
               return
             }
           }
@@ -471,7 +476,9 @@ export default function Login() {
             <>
               <div className="auth-card-header">
                 <h2>{isSignUp ? 'Create Account' : 'Welcome back'}</h2>
-                <p>{isSignUp ? 'Register to access the system' : 'Sign in to your dashboard'}</p>
+                <p>{isSignUp
+                  ? isViewerMode ? 'Enter your viewer key to get view-only access' : 'Register with your region master key'
+                  : 'Sign in to your dashboard'}</p>
               </div>
 
               {/* Tab switcher */}
@@ -480,11 +487,37 @@ export default function Login() {
                 <button type="button" className={`auth-tab ${tab === 'signup' ? 'active' : ''}`} onClick={() => switchTab('signup')}>Create Account</button>
               </div>
 
+              {/* Account type selector — only on sign-up */}
+              {isSignUp && (signUpAllowed || VIEWER_SIGNUP_ENABLED) && (
+                <div className="auth-account-type">
+                  <button
+                    type="button"
+                    className={`auth-type-btn${!isViewerMode ? ' active' : ''}`}
+                    onClick={() => { setIsViewerMode(false); setMasterKey(''); clearError() }}
+                  >
+                    <span className="auth-type-icon">🔑</span>
+                    <span className="auth-type-label">Regional Admin</span>
+                    <span className="auth-type-sub">Requires master key</span>
+                  </button>
+                  {VIEWER_SIGNUP_ENABLED && (
+                    <button
+                      type="button"
+                      className={`auth-type-btn${isViewerMode ? ' active' : ''}`}
+                      onClick={() => { setIsViewerMode(true); setMasterKey(''); clearError() }}
+                    >
+                      <span className="auth-type-icon">👁</span>
+                      <span className="auth-type-label">View Only</span>
+                      <span className="auth-type-sub">Requires viewer key</span>
+                    </button>
+                  )}
+                </div>
+              )}
+
               {error && <div className="auth-alert auth-alert-error"><IconAlert />{error}</div>}
               {success && <div className="auth-alert auth-alert-success"><IconSuccess />{success}</div>}
 
-              {/* Master key — shown at top on sign-up */}
-              {isSignUp && signUpAllowed && (
+              {/* Master key — only for regional admin sign-up */}
+              {isSignUp && !isViewerMode && signUpAllowed && (
                 <InputField
                   id="auth-master-key"
                   label="Master Key"
@@ -497,6 +530,27 @@ export default function Login() {
                   autoComplete="off"
                   rightSlot={eyeToggle(showMasterKey, setShowMasterKey)}
                 />
+              )}
+              {/* Viewer key — only for viewer sign-up */}
+              {isSignUp && isViewerMode && VIEWER_SIGNUP_ENABLED && (
+                <>
+                  <InputField
+                    id="auth-viewer-key"
+                    label="Viewer Key"
+                    type={showViewerKey ? 'text' : 'password'}
+                    icon={<IconKey />}
+                    value={viewerKey}
+                    onChange={(e) => { setViewerKey(e.target.value); clearError() }}
+                    placeholder="Enter viewer key for your region"
+                    required
+                    autoComplete="off"
+                    rightSlot={eyeToggle(showViewerKey, setShowViewerKey)}
+                  />
+                  <div className="auth-viewer-notice">
+                    <span>👁</span>
+                    <p>View Only accounts can browse assets and subscriptions for their region but cannot add, edit, or delete records.</p>
+                  </div>
+                </>
               )}
 
               {/* Google button */}
@@ -606,7 +660,9 @@ export default function Login() {
                 >
                   {loading
                     ? <><span className="auth-spinner" />{isSignUp ? 'Creating account...' : 'Signing in...'}</>
-                    : isSignUp ? 'Create Account' : 'Sign In'}
+                    : isSignUp
+                      ? isViewerMode ? 'Create View Only Account' : 'Create Account'
+                      : 'Sign In'}
                 </button>
 
                 {!signUpAllowed && !isSignUp && (

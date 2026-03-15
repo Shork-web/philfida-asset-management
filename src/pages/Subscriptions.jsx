@@ -105,7 +105,8 @@ function DeleteSubConfirm({ subscription, onClose, onDeleted, toast }) {
 
 /* ── Main Page ── */
 export default function Subscriptions() {
-  const { userRegion } = useAuth() || {}
+  const { userRegion, userRole } = useAuth() || {}
+  const isViewer = userRole === 'viewer'
   const [subs, setSubs] = useState([])
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState(null)
@@ -187,9 +188,11 @@ export default function Subscriptions() {
           <h1>Subscriptions</h1>
           <p>Track software, internet, and service subscriptions.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-          <IconPlus /> Add Subscription
-        </button>
+        {!isViewer && (
+          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+            <IconPlus /> Add Subscription
+          </button>
+        )}
       </header>
 
       {/* ── Stats ── */}
@@ -303,7 +306,7 @@ export default function Subscriptions() {
                 <th>Cost</th>
                 <th>Renewal Date</th>
                 <th>Status</th>
-                <th style={{ width: 90 }}>Actions</th>
+                <th style={{ width: isViewer ? 50 : 90 }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -344,12 +347,16 @@ export default function Subscriptions() {
                       <button className="btn-icon" title="View details" onClick={() => setViewingSub(sub)}>
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" /><circle cx="12" cy="12" r="3" /></svg>
                       </button>
-                      <button className="btn-icon" title="Edit" onClick={() => setEditingSub(sub)}>
-                        <IconEdit />
-                      </button>
-                      <button className="btn-icon danger" title="Delete" onClick={() => setDeletingSub(sub)}>
-                        <IconTrash />
-                      </button>
+                      {!isViewer && (
+                        <>
+                          <button className="btn-icon" title="Edit" onClick={() => setEditingSub(sub)}>
+                            <IconEdit />
+                          </button>
+                          <button className="btn-icon danger" title="Delete" onClick={() => setDeletingSub(sub)}>
+                            <IconTrash />
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -424,19 +431,21 @@ export default function Subscriptions() {
             </div>
             <div className="modal-footer">
               <button type="button" className="btn btn-ghost" onClick={() => setViewingSub(null)}>Close</button>
-              <button
-                type="button" className="btn btn-primary"
-                onClick={() => { setViewingSub(null); setEditingSub(viewingSub) }}
-              >
-                <IconEdit /> Edit
-              </button>
+              {!isViewer && (
+                <button
+                  type="button" className="btn btn-primary"
+                  onClick={() => { setViewingSub(null); setEditingSub(viewingSub) }}
+                >
+                  <IconEdit /> Edit
+                </button>
+              )}
             </div>
           </div>
         </div>
       )}
 
       {/* ── Modals ── */}
-      {showForm && (
+      {!isViewer && showForm && (
         <SubscriptionFormModal
           subscription={null}
           userRegion={userRegion}
@@ -445,7 +454,7 @@ export default function Subscriptions() {
           toast={toast}
         />
       )}
-      {editingSub && (
+      {!isViewer && editingSub && (
         <SubscriptionFormModal
           subscription={editingSub}
           userRegion={userRegion}
@@ -454,7 +463,7 @@ export default function Subscriptions() {
           toast={toast}
         />
       )}
-      {deletingSub && (
+      {!isViewer && deletingSub && (
         <DeleteSubConfirm
           subscription={deletingSub}
           onClose={() => setDeletingSub(null)}
