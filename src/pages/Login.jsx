@@ -219,7 +219,10 @@ export default function Login() {
     if (isSignUp && signUpAllowed) {
       const region = resolveRegionFromKey(masterKey)
       if (!region) {
-        setError('Enter a valid master key for your region before signing up with Google.')
+        setError(
+          'Enter a valid master key for your region (e.g. PhilFIDA1, PhilFIDA7). ' +
+          'Check for typos and restart the app if you recently changed .env.'
+        )
         return
       }
     }
@@ -259,7 +262,13 @@ export default function Login() {
     if (isSignUp) {
       if (!signUpAllowed) { setError('Sign-up is not configured. Contact your administrator.'); return }
       const region = resolveRegionFromKey(masterKey)
-      if (!region) { setError('Invalid master key for your region. Contact your administrator.'); return }
+      if (!region) {
+        setError(
+          'Invalid master key for your region. Use the key for your region (e.g. PhilFIDA1, PhilFIDA7). ' +
+          'Check for typos and restart the app if you recently changed .env.'
+        )
+        return
+      }
       if (!isPasswordStrong(password)) { setError('Please meet all password requirements.'); return }
       if (password !== confirmPassword) { setError('Passwords do not match.'); return }
       if (!validateEmail(email)) { setError('Please enter a valid email address.'); return }
