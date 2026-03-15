@@ -47,7 +47,7 @@ export default function Sidebar({ collapsed, onToggle }) {
       </nav>
 
       <div className="sidebar-footer">
-        {!collapsed && <span>PhilFIDA Asset Management v1.0</span>}
+        {!collapsed && <span>PhilFIDA Asset Management V1.5</span>}
         <button
           className={`sidebar-toggle${collapsed ? ' rotated' : ''}`}
           onClick={onToggle}
