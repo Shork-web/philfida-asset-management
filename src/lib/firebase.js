@@ -38,3 +38,4 @@ export function getFirebaseAuth() {
 }
 
 export const ASSETS_COLLECTION = 'assets'
+export const USERS_COLLECTION = 'users'

@@ -2,17 +2,40 @@ import { useEffect, useState } from 'react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from './firebase'
 import { AuthContext } from './authContext'
+import { getUserProfile } from './userProfile'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
+  const [userRegion, setUserRegion] = useState(null)
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState(null)
 
   useEffect(() => {
     try {
       const auth = getFirebaseAuth()
-      const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
         setUser(firebaseUser)
+        if (firebaseUser) {
+          try {
+            const profile = await getUserProfile(firebaseUser.uid)
+            const region = profile?.region ?? '7'
+            if (!profile) {
+              console.warn(
+                '[Auth] No user profile found for', firebaseUser.uid,
+                '— defaulting to region 7. If this is unexpected, check Firestore rules for the /users collection.'
+              )
+            }
+            setUserRegion(region)
+          } catch (profileErr) {
+            console.error(
+              '[Auth] Failed to read user profile — Firestore /users rules may not be deployed.',
+              profileErr?.message
+            )
+            setUserRegion('7')
+          }
+        } else {
+          setUserRegion(null)
+        }
         setLoading(false)
       })
       return unsubscribe
@@ -75,7 +98,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, loading, logout }}>
+    <AuthContext.Provider value={{ user, userRegion, loading, logout }}>
       {children}
     </AuthContext.Provider>
   )

@@ -14,7 +14,7 @@ function FormSection({ title, children, columns = 2 }) {
   )
 }
 
-export default function AssetFormModal({ asset, onClose, onSaved, toast }) {
+export default function AssetFormModal({ asset, userRegion, onClose, onSaved, toast }) {
   const isEdit = Boolean(asset)
   const [form, setForm] = useState(
     asset
@@ -72,6 +72,7 @@ export default function AssetFormModal({ asset, onClose, onSaved, toast }) {
       quantityPerPropertyCard: form.quantityPerPropertyCard ? Number(form.quantityPerPropertyCard) : null,
       quantityPerPhysicalCount: form.quantityPerPhysicalCount ? Number(form.quantityPerPhysicalCount) : null,
       notes: form.notes.trim() || null,
+      ...(isEdit ? {} : { region: userRegion && userRegion !== 'all' ? userRegion : null }),
     }
 
     try {

@@ -1,5 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { IconDashboard, IconCheckCircle, IconAlertTriangle, IconChevronLeft, IconCreditCard } from './Icons'
+import { useAuth } from '../lib/useAuth'
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
 import './Sidebar.css'
 
@@ -10,12 +11,24 @@ const NAV_ITEMS = [
   { to: '/subscriptions', label: 'Subscriptions', icon: IconCreditCard },
 ]
 
+function regionLabel(userRegion) {
+  if (!userRegion || userRegion === 'all') return 'All Regions'
+  return `Region ${userRegion}`
+}
+
 export default function Sidebar({ collapsed, onToggle }) {
+  const { userRegion } = useAuth()
+
   return (
     <aside className={`sidebar${collapsed ? ' collapsed' : ''}`}>
       <div className="sidebar-brand">
         <img className="sidebar-logo" src={philfidaLogo} alt="PhilFIDA Logo" />
-        {!collapsed && <span className="sidebar-title">PhilFIDA 7</span>}
+        {!collapsed && (
+          <div className="sidebar-brand-text">
+            <span className="sidebar-title">PhilFIDA</span>
+            <span className="sidebar-region">{regionLabel(userRegion)}</span>
+          </div>
+        )}
       </div>
 
       <nav className="sidebar-nav">
@@ -34,7 +47,7 @@ export default function Sidebar({ collapsed, onToggle }) {
       </nav>
 
       <div className="sidebar-footer">
-        {!collapsed && <span>PhilFIDA 7 Asset Management v1.0</span>}
+        {!collapsed && <span>PhilFIDA Asset Management v1.0</span>}
         <button
           className={`sidebar-toggle${collapsed ? ' rotated' : ''}`}
           onClick={onToggle}

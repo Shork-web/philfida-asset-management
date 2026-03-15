@@ -20,7 +20,7 @@ function FormSection({ title, children, columns = 2 }) {
 
 const STATUS_LABELS = { ACTIVE: 'Active', CANCELLED: 'Cancelled' }
 
-export default function SubscriptionFormModal({ subscription, onClose, onSaved, toast }) {
+export default function SubscriptionFormModal({ subscription, userRegion, onClose, onSaved, toast }) {
   const isEdit = Boolean(subscription)
 
   const [form, setForm] = useState(
@@ -64,6 +64,7 @@ export default function SubscriptionFormModal({ subscription, onClose, onSaved, 
       renewalDate:  form.renewalDate || null,
       accountEmail: form.accountEmail.trim() || null,
       notes:        form.notes.trim() || null,
+      ...(isEdit ? {} : { region: userRegion && userRegion !== 'all' ? userRegion : null }),
     }
 
     try {

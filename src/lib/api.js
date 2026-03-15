@@ -7,10 +7,19 @@ import {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore'
+
+function sortByCreatedAtDesc(docs) {
+  return [...docs].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return tb - ta
+  })
+}
 import { getDb, ASSETS_COLLECTION } from './firebase'
 
 function toAssetData(docSnap) {
@@ -32,6 +41,7 @@ function toAssetData(docSnap) {
     quantityPerPropertyCard: d.quantityPerPropertyCard ?? null,
     quantityPerPhysicalCount: d.quantityPerPhysicalCount ?? null,
     notes: d.notes ?? null,
+    region: d.region ?? null,
     createdAt: fromTimestamp(d.createdAt),
     updatedAt: fromTimestamp(d.updatedAt),
   }
@@ -43,12 +53,22 @@ function fromTimestamp(ts) {
   return ts ?? null
 }
 
-export async function fetchAssets() {
+/**
+ * @param {string | null} [region] - User's region from profile. Use 'all' or null to fetch every asset.
+ */
+export async function fetchAssets(region) {
   const db = getDb()
   const col = collection(db, ASSETS_COLLECTION)
-  const q = query(col, orderBy('createdAt', 'desc'))
+  const useRegion = region && region !== 'all'
+
+  // Use a simple single-field query when region-scoped to avoid composite index requirement.
+  // Sort is applied in JS after fetching.
+  const q = useRegion
+    ? query(col, where('region', '==', region))
+    : query(col, orderBy('createdAt', 'desc'))
+
   const snapshot = await getDocs(q)
-  return snapshot.docs.map((d) => {
+  const rows = snapshot.docs.map((d) => {
     const data = d.data()
     return {
       id: d.id,
@@ -58,14 +78,20 @@ export async function fetchAssets() {
       assignedTo: data.assignedTo ?? null,
       purchaseDate: data.purchaseDate ?? null,
       notes: data.notes ?? null,
+      region: data.region ?? null,
       createdAt: fromTimestamp(data.createdAt),
       updatedAt: fromTimestamp(data.updatedAt),
     }
   })
+
+  return useRegion ? sortByCreatedAtDesc(rows) : rows
 }
 
-export async function fetchStats() {
-  const assets = await fetchAssets()
+/**
+ * @param {string | null} [region] - Same as fetchAssets; stats are computed from region-filtered assets.
+ */
+export async function fetchStats(region) {
+  const assets = await fetchAssets(region)
   const total = assets.length
   const byStatus = {}
   const byType = {}
@@ -98,6 +124,7 @@ export async function createAsset(payload) {
     quantityPerPropertyCard: payload.quantityPerPropertyCard ?? null,
     quantityPerPhysicalCount: payload.quantityPerPhysicalCount ?? null,
     notes: payload.notes ?? null,
+    region: payload.region ?? null,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   })

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../lib/useAuth'
 import { fetchAssets } from '../lib/api'
 import { SERVICEABLE_STATUSES, formatPHP } from '../lib/constants'
 import AssetTable from '../components/AssetTable'
@@ -10,6 +11,7 @@ import { IconRefresh, IconDownload } from '../components/Icons'
 import { exportAssetsToExcel } from '../lib/exportExcel'
 
 export default function ServiceableAssets() {
+  const { userRegion } = useAuth() || {}
   const [allAssets, setAllAssets] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingAsset, setEditingAsset] = useState(null)
@@ -19,13 +21,13 @@ export default function ServiceableAssets() {
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      setAllAssets(await fetchAssets())
+      setAllAssets(await fetchAssets(userRegion ?? 'all'))
     } catch {
       toast('Could not load assets.', 'error')
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, userRegion])
 
   useEffect(() => { load() }, [load])
 
@@ -91,7 +93,7 @@ export default function ServiceableAssets() {
         />
       </section>
 
-      {editingAsset && <AssetFormModal asset={editingAsset} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
+      {editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
       {deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
       <ToastContainer toasts={toasts} />
     </>

@@ -7,6 +7,7 @@ import {
   updateDoc,
   deleteDoc,
   query,
+  where,
   orderBy,
   serverTimestamp,
   Timestamp,
@@ -117,17 +118,34 @@ function toSubData(docSnap) {
     renewalDate: d.renewalDate ?? null,
     accountEmail: d.accountEmail ?? null,
     notes: d.notes ?? null,
+    region: d.region ?? null,
     createdAt: fromTimestamp(d.createdAt),
     updatedAt: fromTimestamp(d.updatedAt),
   }
 }
 
-export async function fetchSubscriptions() {
+/**
+ * @param {string | null} [region] - User's region. Use 'all' or null to fetch every subscription.
+ */
+function sortByCreatedAtDesc(docs) {
+  return [...docs].sort((a, b) => {
+    const ta = a.createdAt ? new Date(a.createdAt).getTime() : 0
+    const tb = b.createdAt ? new Date(b.createdAt).getTime() : 0
+    return tb - ta
+  })
+}
+
+export async function fetchSubscriptions(region) {
   const db = getDb()
   const col = collection(db, SUBSCRIPTIONS_COLLECTION)
-  const q = query(col, orderBy('createdAt', 'desc'))
+  const useRegion = region && region !== 'all'
+
+  const q = useRegion
+    ? query(col, where('region', '==', region))
+    : query(col, orderBy('createdAt', 'desc'))
+
   const snapshot = await getDocs(q)
-  return snapshot.docs.map((d) => {
+  const rows = snapshot.docs.map((d) => {
     const data = d.data()
     return {
       id: d.id,
@@ -138,10 +156,13 @@ export async function fetchSubscriptions() {
       renewalDate: data.renewalDate ?? null,
       accountEmail: data.accountEmail ?? null,
       notes: data.notes ?? null,
+      region: data.region ?? null,
       createdAt: fromTimestamp(data.createdAt),
       updatedAt: fromTimestamp(data.updatedAt),
     }
   })
+
+  return useRegion ? sortByCreatedAtDesc(rows) : rows
 }
 
 export async function createSubscription(payload) {

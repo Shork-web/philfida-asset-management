@@ -41,11 +41,28 @@
   flex-shrink: 0;
 }
 
+.sidebar-brand-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
 .sidebar-title {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1rem;
   color: #fff;
   white-space: nowrap;
+  line-height: 1.2;
+}
+
+.sidebar-region {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.65);
+  white-space: nowrap;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 /* ── Nav ── */

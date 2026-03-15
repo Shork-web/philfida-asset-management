@@ -8,9 +8,9 @@ import {
   updateProfile,
 } from 'firebase/auth'
 import { getFirebaseAuth } from '../lib/firebase'
+import { isSignUpEnabled, resolveRegionFromKey } from '../lib/regionKeys'
+import { setUserProfile } from '../lib/userProfile'
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
-
-const MASTER_KEY = import.meta.env.VITE_SIGNUP_MASTER_KEY || ''
 
 function validateEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value || '').trim())
@@ -187,7 +187,7 @@ export default function Login() {
   const [resetLoading, setResetLoading] = useState(false)
 
   const isSignUp = tab === 'signup'
-  const signUpAllowed = Boolean(MASTER_KEY.trim())
+  const signUpAllowed = isSignUpEnabled()
   const passwordStrength = useMemo(() => getPasswordStrength(password), [password])
   const score = useMemo(() => strengthScore(passwordStrength), [passwordStrength])
   const passwordsMatch = !confirmPassword || password === confirmPassword
@@ -214,15 +214,36 @@ export default function Login() {
 
   const onGoogleSignIn = async () => {
     setError('')
-    if (isSignUp && signUpAllowed && masterKey.trim() !== MASTER_KEY.trim()) {
-      setError('Enter the master key above before signing up with Google.')
-      return
+    if (isSignUp && signUpAllowed) {
+      const region = resolveRegionFromKey(masterKey)
+      if (!region) {
+        setError('Enter a valid master key for your region before signing up with Google.')
+        return
+      }
     }
     setGoogleLoading(true)
     try {
       const provider = new GoogleAuthProvider()
       provider.setCustomParameters({ prompt: 'select_account' })
-      await signInWithPopup(getFirebaseAuth(), provider)
+      const result = await signInWithPopup(getFirebaseAuth(), provider)
+      if (isSignUp && signUpAllowed && result?.user) {
+        const region = resolveRegionFromKey(masterKey)
+        if (region) {
+          try {
+            await setUserProfile(result.user.uid, {
+              region,
+              displayName: result.user.displayName ?? null,
+              email: result.user.email ?? null,
+            })
+          } catch (profileErr) {
+            console.error('Could not save user region profile:', profileErr?.message)
+            setError(
+              'Signed in with Google, but your region could not be saved — the Firestore security rules may not be deployed yet. ' +
+              'Ask your administrator to publish the rules in Firebase Console → Firestore → Rules, then sign up again.'
+            )
+          }
+        }
+      }
     } catch (err) {
       setError(friendlyError(err.code))
     } finally {
@@ -235,7 +256,8 @@ export default function Login() {
     setError('')
     if (isSignUp) {
       if (!signUpAllowed) { setError('Sign-up is not configured. Contact your administrator.'); return }
-      if (masterKey.trim() !== MASTER_KEY.trim()) { setError('Invalid master key. Contact your administrator.'); return }
+      const region = resolveRegionFromKey(masterKey)
+      if (!region) { setError('Invalid master key for your region. Contact your administrator.'); return }
       if (!isPasswordStrong(password)) { setError('Please meet all password requirements.'); return }
       if (password !== confirmPassword) { setError('Passwords do not match.'); return }
       if (!validateEmail(email)) { setError('Please enter a valid email address.'); return }
@@ -243,8 +265,27 @@ export default function Login() {
     setLoading(true)
     try {
       if (isSignUp) {
+        const region = resolveRegionFromKey(masterKey)
         const cred = await createUserWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
         if (displayName.trim()) await updateProfile(cred.user, { displayName: displayName.trim() })
+        if (region) {
+          try {
+            await setUserProfile(cred.user.uid, {
+              region,
+              displayName: displayName.trim() || null,
+              email: cred.user.email ?? null,
+            })
+          } catch (profileErr) {
+            // Profile write failed – likely Firestore rules not yet deployed.
+            // Sign-up still succeeds but the user will default to region '7' until rules are live.
+            console.error('Could not save user region profile:', profileErr?.message)
+            setError(
+              'Account created, but your region could not be saved — the Firestore security rules may not be deployed yet. ' +
+              'Ask your administrator to publish the rules in Firebase Console → Firestore → Rules, then sign up again.'
+            )
+            return
+          }
+        }
       } else {
         await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
       }
@@ -310,7 +351,7 @@ export default function Login() {
           <div className="auth-logo-wrap">
             <img src={philfidaLogo} alt="PhilFIDA Logo" className="auth-logo" />
           </div>
-          <h1>PhilFIDA 7</h1>
+          <h1>Philippine Fiber Industry Development Authority</h1>
           <p className="auth-tagline">Asset Management System</p>
           <div className="auth-divider" />
 
@@ -337,7 +378,7 @@ export default function Login() {
         </div>
 
         <p className="auth-panel-footer">
-          Philippine Fiber Industry Development Authority — Region 7
+          Philippine Fiber Industry Development Authority
         </p>
       </div>
 

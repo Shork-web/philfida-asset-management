@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useAuth } from '../lib/useAuth'
 import {
   fetchSubscriptions, deleteSubscription,
   getComputedStatus, toMonthlyRate,
@@ -104,6 +105,7 @@ function DeleteSubConfirm({ subscription, onClose, onDeleted, toast }) {
 
 /* ── Main Page ── */
 export default function Subscriptions() {
+  const { userRegion } = useAuth() || {}
   const [subs, setSubs] = useState([])
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState(null)
@@ -120,7 +122,7 @@ export default function Subscriptions() {
     setLoading(true)
     setConfigError(null)
     try {
-      const data = await fetchSubscriptions()
+      const data = await fetchSubscriptions(userRegion ?? 'all')
       setSubs(data)
     } catch (err) {
       const msg = err?.message?.includes('Firebase is not configured')
@@ -131,7 +133,7 @@ export default function Subscriptions() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, userRegion])
 
   useEffect(() => { load() }, [load])
 
@@ -437,6 +439,7 @@ export default function Subscriptions() {
       {showForm && (
         <SubscriptionFormModal
           subscription={null}
+          userRegion={userRegion}
           onClose={() => setShowForm(false)}
           onSaved={load}
           toast={toast}
@@ -445,6 +448,7 @@ export default function Subscriptions() {
       {editingSub && (
         <SubscriptionFormModal
           subscription={editingSub}
+          userRegion={userRegion}
           onClose={() => setEditingSub(null)}
           onSaved={load}
           toast={toast}

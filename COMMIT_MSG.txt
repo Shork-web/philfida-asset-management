@@ -1,0 +1,38 @@
+Region-based access, branding updates, and Firestore rules
+
+- Region-based access & multiple master keys
+  - Add VITE_MASTER_KEYS support (regions 1–13 + optional "all" admin key)
+  - New lib: regionKeys.js (resolveRegionFromKey, isSignUpEnabled)
+  - New lib: userProfile.js + Firestore users/{uid} (region, displayName, email)
+  - AuthProvider: fetch user profile on login, expose userRegion (default '7' when no profile)
+  - Login: validate master key per region; write user profile on sign-up (email & Google)
+  - ProtectedRoute: wait for userRegion before rendering app
+
+- Data scoping by region
+  - api.js: fetchAssets(region), fetchStats(region), createAsset with region; single-field region query + JS sort (no composite index)
+  - subscriptionsApi.js: fetchSubscriptions(region), create/update with region; same query pattern
+  - Dashboard, ServiceableAssets, UnserviceableAssets, Subscriptions: pass userRegion to fetch and to modals
+  - AssetFormModal, SubscriptionFormModal: set region on create from userRegion
+  - Firestore rules: users (own doc only); assets/subscriptions scoped by user region or 'all'
+
+- One-time migration & admin
+  - migrateRegion.js: assign existing assets/subscriptions without region to region "7"
+  - Dashboard: migration banner + "Assign existing data to Region 7" for userRegion === 'all'
+  - .env.example + .env: VITE_MASTER_KEYS with regions 1–13 and "all":"PhilFIDA-Admin"
+  - firestore.indexes.json: composite indexes for region+createdAt (optional after query change)
+  - firestore.rules: function getUserRegion(); users/assets/subscriptions rules (paste into Console)
+
+- Login & profile error handling
+  - Login: try/catch setUserProfile; show clear error if Firestore rules not deployed
+  - AuthProvider: console warn/error when profile read fails or missing
+
+- UI & branding
+  - Login: "PhilFIDA 7" → "Philippine Fiber Industry Development Authority"; footer simplified
+  - Sidebar: show current region (e.g. "Region 8", "All Regions") under PhilFIDA in brand area
+  - Dashboard: region badge next to subtitle ("Region 7" / "Admin — All Regions")
+  - UserMenu: show "Region N" in dropdown when not admin
+  - App.css: auth-panel h1 size, region-badge and migration-banner styles
+
+- Bug fixes
+  - Dashboard: define load before runMigration to fix "Cannot access 'load' before initialization"
+  - Subscriptions + Serviceable/Unserviceable pages: pass userRegion to fetch and AssetFormModal

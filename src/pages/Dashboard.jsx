@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
+import { useAuth } from '../lib/useAuth'
 import { fetchAssets, fetchStats } from '../lib/api'
 import { formatPHP } from '../lib/constants'
 import AssetTable from '../components/AssetTable'
@@ -10,6 +11,7 @@ import { IconPlus, IconRefresh, IconDownload } from '../components/Icons'
 import { exportAssetsToExcel } from '../lib/exportExcel'
 
 export default function Dashboard() {
+  const { userRegion } = useAuth() || {}
   const [assets, setAssets] = useState([])
   const [loading, setLoading] = useState(true)
   const [configError, setConfigError] = useState(null)
@@ -23,7 +25,10 @@ export default function Dashboard() {
     setLoading(true)
     setConfigError(null)
     try {
-      const [assetData, statsData] = await Promise.all([fetchAssets(), fetchStats()])
+      const [assetData, statsData] = await Promise.all([
+        fetchAssets(userRegion ?? 'all'),
+        fetchStats(userRegion ?? 'all'),
+      ])
       setAssets(assetData)
       setStats(statsData)
     } catch (err) {
@@ -35,7 +40,7 @@ export default function Dashboard() {
     } finally {
       setLoading(false)
     }
-  }, [toast])
+  }, [toast, userRegion])
 
   useEffect(() => { load() }, [load])
 
@@ -48,7 +53,14 @@ export default function Dashboard() {
       <header className="page-header">
         <div>
           <h1>Dashboard</h1>
-          <p>Overview of all Assets and quick actions.</p>
+          <p>
+            Overview of all Assets and quick actions.
+            {userRegion && (
+              <span className={`region-badge${userRegion === 'all' ? ' region-badge-admin' : ''}`}>
+                {userRegion === 'all' ? 'Admin — All Regions' : `Region ${userRegion}`}
+              </span>
+            )}
+          </p>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(true)}>
           <IconPlus /> Add Asset
@@ -134,8 +146,8 @@ export default function Dashboard() {
         />
       </section>
 
-      {showForm && <AssetFormModal asset={null} onClose={() => setShowForm(false)} onSaved={load} toast={toast} />}
-      {editingAsset && <AssetFormModal asset={editingAsset} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
+      {showForm && <AssetFormModal asset={null} userRegion={userRegion} onClose={() => setShowForm(false)} onSaved={load} toast={toast} />}
+      {editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
       {deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
       <ToastContainer toasts={toasts} />
     </>
