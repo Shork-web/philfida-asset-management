@@ -438,6 +438,38 @@
   color: var(--color-gray-400);
 }
 
+.bulk-action-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0;
+  margin-bottom: 0.25rem;
+}
+
+.bulk-action-count {
+  font-size: 0.85rem;
+  color: var(--color-gray-600);
+  font-weight: 500;
+}
+
+.bulk-th {
+  width: 40px;
+  vertical-align: middle;
+}
+
+.bulk-th input {
+  cursor: pointer;
+}
+
+.bulk-td {
+  width: 40px;
+  vertical-align: middle;
+}
+
+.bulk-td input {
+  cursor: pointer;
+}
+
 /* ── Table ── */
 .table-wrap {
   overflow-x: auto;
@@ -501,6 +533,32 @@ tbody tr:hover {
   font-size: 0.75rem;
   color: var(--color-gray-400);
   margin-top: 0.1rem;
+}
+
+.life-indicator {
+  display: inline-block;
+  margin-top: 0.2rem;
+  font-size: 0.75rem;
+  color: var(--color-gray-600);
+  font-weight: 500;
+}
+
+.life-indicator-over {
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.life-years-left {
+  color: var(--color-primary);
+}
+
+.life-years-over {
+  color: #991b1b;
+}
+
+.scan-qr-life-hint {
+  font-size: 0.85em;
+  color: var(--color-gray-500);
 }
 
 .replacement-badge {
@@ -701,6 +759,10 @@ tbody tr:hover {
   grid-column: span 2;
 }
 
+.af-span-3 {
+  grid-column: span 3;
+}
+
 .af-required {
   color: var(--color-danger);
   font-weight: 700;
@@ -728,6 +790,176 @@ tbody tr:hover {
 .confirm-body .confirm-sub {
   color: var(--color-gray-500);
   font-size: 0.85rem;
+}
+
+/* ── Export Modal ── */
+.export-modal-body {
+  padding: 1.25rem 1.5rem;
+}
+
+.export-modal-body p {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--color-gray-600);
+}
+
+.export-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.export-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+  text-align: left;
+}
+
+.export-option:hover {
+  border-color: var(--color-gray-300);
+  background: var(--color-gray-50);
+}
+
+.export-option.selected {
+  border-color: var(--color-primary);
+  background: rgba(22, 101, 52, 0.06);
+  box-shadow: 0 0 0 2px rgba(22, 101, 52, 0.12);
+}
+
+.export-option.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.export-option-label {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--color-gray-800);
+}
+
+.export-option-desc {
+  font-size: 0.8rem;
+  color: var(--color-gray-500);
+  margin-top: 0.15rem;
+}
+
+.export-option-count {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.export-modal-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  color: var(--color-gray-600);
+}
+
+.export-option-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.9rem 1.1rem;
+  border: 2px solid var(--color-gray-200);
+  border-radius: var(--radius);
+  background: #fff;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.export-option-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  background: rgba(22, 101, 52, 0.06);
+  box-shadow: 0 0 0 2px rgba(22, 101, 52, 0.12);
+}
+
+.export-option-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Import Modal ── */
+.import-hint {
+  margin: 0 0 1rem;
+  font-size: 0.875rem;
+  color: var(--color-gray-600);
+  line-height: 1.5;
+}
+
+.import-upload {
+  margin-bottom: 1rem;
+}
+
+.import-file-input {
+  position: absolute;
+  width: 0;
+  height: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.import-error {
+  padding: 0.65rem 1rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: var(--radius);
+  color: #991b1b;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.import-preview h4 {
+  margin: 0 0 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--color-gray-800);
+}
+
+.import-preview-table-wrap {
+  overflow-x: auto;
+  max-height: 240px;
+  overflow-y: auto;
+  border: 1px solid var(--color-gray-200);
+  border-radius: var(--radius);
+}
+
+.import-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.82rem;
+}
+
+.import-preview-table th {
+  background: var(--color-gray-50);
+  padding: 0.5rem 0.65rem;
+  text-align: left;
+  font-weight: 600;
+  color: var(--color-gray-600);
+}
+
+.import-preview-table td {
+  padding: 0.45rem 0.65rem;
+  border-top: 1px solid var(--color-gray-100);
+}
+
+.import-preview-more {
+  margin: 0.35rem 0 0;
+  font-size: 0.8rem;
+  color: var(--color-gray-500);
 }
 
 /* ── Asset Detail Modal ── */

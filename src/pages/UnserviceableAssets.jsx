@@ -5,10 +5,11 @@ import { UNSERVICEABLE_STATUSES, formatPHP } from '../lib/constants'
 import AssetTable from '../components/AssetTable'
 import AssetFormModal from '../components/AssetFormModal'
 import DeleteConfirm from '../components/DeleteConfirm'
+import BulkDeleteConfirm from '../components/BulkDeleteConfirm'
 import { useToasts } from '../lib/useToasts'
 import { ToastContainer } from '../components/Toasts'
-import { IconRefresh, IconDownload } from '../components/Icons'
-import { exportAssetsToExcel } from '../lib/exportExcel'
+import { IconRefresh, IconDownload, IconTrash } from '../components/Icons'
+import ExportModal from '../components/ExportModal'
 
 export default function UnserviceableAssets() {
   const { userRegion, userRole } = useAuth() || {}
@@ -17,6 +18,9 @@ export default function UnserviceableAssets() {
   const [loading, setLoading] = useState(true)
   const [editingAsset, setEditingAsset] = useState(null)
   const [deletingAsset, setDeletingAsset] = useState(null)
+  const [bulkDeletingAssets, setBulkDeletingAssets] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [showExport, setShowExport] = useState(false)
   const { toasts, push: toast } = useToasts()
 
   const load = useCallback(async () => {
@@ -63,10 +67,19 @@ export default function UnserviceableAssets() {
         <div className="panel-header">
           <h2>Unserviceable Assets</h2>
           <div className="panel-actions">
+            {!isViewer && (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => setBulkDeletingAssets(assets.filter((a) => selectedIds.has(a.id)))}
+                disabled={selectedIds.size === 0}
+              >
+                <IconTrash /> Bulk Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              </button>
+            )}
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => exportAssetsToExcel(assets, 'PhilFIDA7_Unserviceable_Assets')}
-              disabled={assets.length === 0}
+              onClick={() => setShowExport(true)}
+              disabled={allAssets.length === 0}
             >
               <IconDownload /> Export
             </button>
@@ -80,6 +93,9 @@ export default function UnserviceableAssets() {
           loading={loading}
           onEdit={setEditingAsset}
           onDelete={setDeletingAsset}
+          onBulkDelete={!isViewer ? setBulkDeletingAssets : undefined}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
           emptyMessage="No unserviceable assets found."
           readonly={isViewer}
         />
@@ -87,6 +103,10 @@ export default function UnserviceableAssets() {
 
       {!isViewer && editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
       {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
+      {!isViewer && bulkDeletingAssets && (
+        <BulkDeleteConfirm assets={bulkDeletingAssets} onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }} onDeleted={() => { load(); setSelectedIds(new Set()) }} toast={toast} />
+      )}
+      {showExport && <ExportModal assets={allAssets} onClose={() => setShowExport(false)} />}
       <ToastContainer toasts={toasts} />
     </>
   )

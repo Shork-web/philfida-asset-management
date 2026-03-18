@@ -1,13 +1,17 @@
 import { useMemo, useState } from 'react'
-import { TYPE_OPTIONS, TYPE_LABELS, STATUS_OPTIONS, STATUS_LABELS, formatPHP } from '../lib/constants'
+import { TYPE_OPTIONS, TYPE_LABELS, STATUS_OPTIONS, STATUS_LABELS, formatPHP, getAssetLifeInfo, ASSET_LIFE_YEARS } from '../lib/constants'
 import StatusBadge from './StatusBadge'
 import { IconEye, IconEdit, IconTrash, IconX, IconQrCode } from './Icons'
 import AssetQRModal from './AssetQRModal'
 
-const CURRENT_YEAR = new Date().getFullYear()
-function isForReplacement(yearOfAcquisition) {
-  if (!yearOfAcquisition) return false
-  return (CURRENT_YEAR - Number(yearOfAcquisition)) >= 5
+function formatLifeIndicator(info) {
+  if (!info) return null
+  const { age, yearsLeft, forReplacement } = info
+  const ageStr = `${age} yr${age !== 1 ? 's' : ''} in service`
+  if (forReplacement) {
+    return { primary: `${ageStr} · ⚠ For Replacement`, over: null }
+  }
+  return { primary: ageStr, yearsLeft: yearsLeft > 0 ? `${yearsLeft} yr${yearsLeft !== 1 ? 's' : ''} left` : null }
 }
 
 const SORT_FIELDS = [
@@ -48,9 +52,12 @@ function IconSortDesc() {
   )
 }
 
-export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMessage, hideStatusFilter, readonly }) {
+export default function AssetTable({ assets, loading, onEdit, onDelete, onBulkDelete, emptyMessage, hideStatusFilter, readonly, selectedIds: controlledSelectedIds, onSelectionChange }) {
   const [viewingAsset, setViewingAsset] = useState(null)
   const [qrAsset, setQrAsset] = useState(null)
+  const [internalSelectedIds, setInternalSelectedIds] = useState(new Set())
+  const selectedIds = controlledSelectedIds ?? internalSelectedIds
+  const setSelectedIds = onSelectionChange ?? setInternalSelectedIds
   const [search, setSearch] = useState('')
   const [filterType, setFilterType] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -123,6 +130,30 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
 
   const statusOptionsToShow = hideStatusFilter ? [] : STATUS_OPTIONS
 
+  const showBulk = !readonly && onBulkDelete
+  const selectedCount = selectedIds.size
+  const filteredIds = useMemo(() => new Set(filtered.map((a) => a.id)), [filtered])
+  const allSelected = filtered.length > 0 && filtered.every((a) => selectedIds.has(a.id))
+  const toggleSelect = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+  const toggleSelectAll = () => {
+    if (allSelected) setSelectedIds(new Set())
+    else setSelectedIds(new Set(filtered.map((a) => a.id)))
+  }
+  const handleBulkDelete = () => {
+    const toDelete = filtered.filter((a) => selectedIds.has(a.id))
+    if (toDelete.length && onBulkDelete) {
+      onBulkDelete(toDelete)
+      setSelectedIds(new Set())
+    }
+  }
+
   return (
     <>
       <div className="table-toolbar">
@@ -187,10 +218,29 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
         <p className="result-count">{filtered.length} result{filtered.length !== 1 ? 's' : ''} found</p>
       )}
 
+      {showBulk && selectedCount > 0 && (
+        <div className="bulk-action-bar">
+          <span className="bulk-action-count">{selectedCount} selected</span>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => setSelectedIds(new Set())}>
+            Clear selection
+          </button>
+        </div>
+      )}
+
       <div className="table-wrap">
         <table>
           <thead>
             <tr>
+              {showBulk && (
+                <th className="bulk-th">
+                  <input
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleSelectAll}
+                    title="Select all"
+                  />
+                </th>
+              )}
               <th className="sortable-th" onClick={() => toggleSort('assetTag')}>
                 Old Property No. {sortField === 'assetTag' && (sortDir === 'asc' ? <IconSortAsc /> : <IconSortDesc />)}
               </th>
@@ -221,15 +271,27 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
           <tbody>
             {!loading && filtered.length === 0 && (
               <tr>
-                <td colSpan="9" className="empty-state">
+                <td colSpan={showBulk ? 10 : 9} className="empty-state">
                   {hasFilters ? 'No assets match your filters.' : (emptyMessage || 'No assets found.')}
                 </td>
               </tr>
             )}
             {filtered.map((asset) => {
-              const forReplacement = isForReplacement(asset.yearOfAcquisition)
+              const lifeInfo = getAssetLifeInfo(asset.yearOfAcquisition)
+              const lifeIndicator = formatLifeIndicator(lifeInfo)
+              const forReplacement = lifeInfo?.forReplacement ?? false
               return (
               <tr key={asset.id} className={forReplacement ? 'row-for-replacement' : ''}>
+                {showBulk && (
+                  <td className="bulk-td">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(asset.id)}
+                      onChange={() => toggleSelect(asset.id)}
+                      onClick={(e) => e.stopPropagation()}
+                    />
+                  </td>
+                )}
                 <td><strong style={{ fontFamily: 'monospace', fontSize: '0.85rem' }}>{asset.assetTag}</strong></td>
                 <td>
                   {asset.newPropertyNumber
@@ -239,7 +301,16 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
                 <td>
                   <span className="asset-name">{asset.name}</span>
                   {asset.serialNumber && <><br /><span className="asset-serial">S/N: {asset.serialNumber}</span></>}
-                  {forReplacement && <><br /><span className="replacement-badge">⚠ For Replacement</span></>}
+                  {lifeIndicator && (
+                    <>
+                      <br />
+                      <span className={`life-indicator ${forReplacement ? 'life-indicator-over' : ''}`}>
+                        {lifeIndicator.primary}
+                        {lifeIndicator.yearsLeft && <span className="life-years-left"> · {lifeIndicator.yearsLeft}</span>}
+                        {lifeIndicator.over && <span className="life-years-over"> · {lifeIndicator.over}</span>}
+                      </span>
+                    </>
+                  )}
                 </td>
                 <td>
                   <span>{TYPE_LABELS[asset.type] || asset.type}</span>
@@ -280,7 +351,7 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
           <div className="modal asset-detail-modal" onMouseDown={(e) => e.stopPropagation()}>
             <div className="modal-head">
               <h3>Asset Details</h3>
-              {isForReplacement(viewingAsset.yearOfAcquisition) && (
+              {getAssetLifeInfo(viewingAsset.yearOfAcquisition)?.forReplacement && (
                 <span className="replacement-badge-lg">⚠ For Replacement</span>
               )}
               <button className="btn-icon" onClick={() => setViewingAsset(null)} type="button"><IconX /></button>
@@ -316,11 +387,29 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, emptyMes
                   <span className="detail-value"><StatusBadge status={viewingAsset.status} /></span>
                 </div>
                 <div className="detail-item">
-                  <span className="detail-label">Year of Acquisition</span>
+                  <span className="detail-label">Year of Acquisition & Service Life</span>
                   <span className="detail-value">
-                    {viewingAsset.yearOfAcquisition
-                      ? <>{viewingAsset.yearOfAcquisition} <span style={{ color: 'var(--color-gray-400)', fontSize: '0.8rem' }}>({CURRENT_YEAR - Number(viewingAsset.yearOfAcquisition)} yr{CURRENT_YEAR - Number(viewingAsset.yearOfAcquisition) !== 1 ? 's' : ''} ago)</span></>
-                      : <span className="text-muted">N/A</span>}
+                    {viewingAsset.yearOfAcquisition ? (
+                      (() => {
+                        const info = getAssetLifeInfo(viewingAsset.yearOfAcquisition)
+                        if (!info) return <span className="text-muted">N/A</span>
+                        const { age, yearsLeft, forReplacement } = info
+                        const LIFE = ASSET_LIFE_YEARS
+                        return (
+                          <>
+                            {viewingAsset.yearOfAcquisition}
+                            <span className="detail-life-info">
+                              {' · '}{age} yr{age !== 1 ? 's' : ''} in service
+                              {forReplacement
+                                ? <> · <strong style={{ color: '#991b1b' }}>For Replacement</strong></>
+                                : <> · {yearsLeft} yr{yearsLeft !== 1 ? 's' : ''} left before 5-yr life</>}
+                            </span>
+                          </>
+                        )
+                      })()
+                    ) : (
+                      <span className="text-muted">N/A</span>
+                    )}
                   </span>
                 </div>
                 <div className="detail-item">

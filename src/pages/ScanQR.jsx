@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import jsQR from 'jsqr'
 import { parseAssetQRPayload } from '../lib/assetQRPayload'
-import { TYPE_LABELS, formatPHP } from '../lib/constants'
+import { TYPE_LABELS, formatPHP, getAssetLifeInfo, ASSET_LIFE_YEARS } from '../lib/constants'
 import StatusBadge from '../components/StatusBadge'
 
 function checkSecureContext() {
@@ -347,7 +347,29 @@ export default function ScanQR() {
                 <section className="scan-qr-result-section">
                   <h3>Acquisition & value</h3>
                   <dl className="scan-qr-result-dl">
-                    <div><dt>Year of acquisition</dt><dd>{scanResult.yearOfAcquisition || '—'}</dd></div>
+                    <div>
+                      <dt>Year of acquisition</dt>
+                      <dd>
+                        {scanResult.yearOfAcquisition ? (
+                          (() => {
+                            const info = getAssetLifeInfo(scanResult.yearOfAcquisition)
+                            if (!info) return scanResult.yearOfAcquisition
+                            const { age, yearsLeft, forReplacement } = info
+                            return (
+                              <>
+                                {scanResult.yearOfAcquisition}
+                                <span className="scan-qr-life-hint">
+                                  {' · '}{age} yr{age !== 1 ? 's' : ''} in service
+{forReplacement
+                                      ? <> · For Replacement</>
+                                      : <> · {yearsLeft} yr{yearsLeft !== 1 ? 's' : ''} left before 5-yr life</>}
+                                </span>
+                              </>
+                            )
+                          })()
+                        ) : '—'}
+                      </dd>
+                    </div>
                     <div><dt>Total value</dt><dd className="scan-qr-result-value">{formatPHP(scanResult.value)}</dd></div>
                     {scanResult.quantityPerPropertyCard != null && (
                       <div><dt>Qty (property card)</dt><dd>{scanResult.quantityPerPropertyCard}</dd></div>

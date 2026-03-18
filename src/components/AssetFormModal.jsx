@@ -22,6 +22,7 @@ export default function AssetFormModal({ asset, userRegion, onClose, onSaved, to
           assetTag: asset.assetTag,
           newPropertyNumber: asset.newPropertyNumber || '',
           name: asset.name,
+          description: asset.description || '',
           type: asset.type,
           subtype: asset.subtype || '',
           status: asset.status,
@@ -58,9 +59,10 @@ export default function AssetFormModal({ asset, userRegion, onClose, onSaved, to
     e.preventDefault()
     setSaving(true)
     const payload = {
-      assetTag: form.assetTag.trim(),
-      newPropertyNumber: form.newPropertyNumber.trim() || null,
+      assetTag: form.assetTag.trim() || null,
+      newPropertyNumber: form.newPropertyNumber.trim(),
       name: form.name.trim(),
+      description: form.description.trim() || null,
       type: form.type,
       subtype: form.subtype || null,
       status: form.status,
@@ -106,12 +108,12 @@ export default function AssetFormModal({ asset, userRegion, onClose, onSaved, to
             {/* ── Property Numbers ── */}
             <FormSection title="Property Numbers" columns={2}>
               <div className="form-group">
-                <label htmlFor="af-assetTag">Old Property Number <span className="af-required">*</span></label>
-                <input id="af-assetTag" name="assetTag" placeholder="e.g. 19225-1469" value={form.assetTag} onChange={onChange} required />
+                <label htmlFor="af-assetTag">Old Property Number <span className="af-optional">Optional</span></label>
+                <input id="af-assetTag" name="assetTag" placeholder="e.g. 19225-1469" value={form.assetTag} onChange={onChange} />
               </div>
               <div className="form-group">
-                <label htmlFor="af-newPropertyNumber">New Property Number <span className="af-optional">Optional</span></label>
-                <input id="af-newPropertyNumber" name="newPropertyNumber" placeholder="e.g. 2024-0042" value={form.newPropertyNumber} onChange={onChange} />
+                <label htmlFor="af-newPropertyNumber">New Property Number <span className="af-required">*</span></label>
+                <input id="af-newPropertyNumber" name="newPropertyNumber" placeholder="e.g. 2024-0042" value={form.newPropertyNumber} onChange={onChange} required />
               </div>
             </FormSection>
 
@@ -124,6 +126,10 @@ export default function AssetFormModal({ asset, userRegion, onClose, onSaved, to
               <div className="form-group">
                 <label htmlFor="af-serial">Serial Number <span className="af-optional">Optional</span></label>
                 <input id="af-serial" name="serialNumber" placeholder="e.g. SN-00123" value={form.serialNumber} onChange={onChange} />
+              </div>
+              <div className="form-group af-span-3">
+                <label htmlFor="af-description">Description <span className="af-optional">Optional</span></label>
+                <textarea id="af-description" name="description" rows="2" placeholder="e.g. RAM size, storage size, and other specs..." value={form.description} onChange={onChange} />
               </div>
               <div className="form-group">
                 <label htmlFor="af-type">Type</label>
@@ -191,7 +197,7 @@ export default function AssetFormModal({ asset, userRegion, onClose, onSaved, to
             <div className="af-section">
               <p className="af-section-title">Remarks</p>
               <div className="form-group">
-                <textarea id="af-notes" name="notes" rows="2" placeholder="Optional notes or observations..." value={form.notes} onChange={onChange} />
+                <textarea id="af-notes" name="notes" rows="2" placeholder="e.g. POOR condition, good condition, bad condition" value={form.notes} onChange={onChange} />
               </div>
             </div>
 

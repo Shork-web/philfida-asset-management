@@ -5,10 +5,12 @@ import { formatPHP } from '../lib/constants'
 import AssetTable from '../components/AssetTable'
 import AssetFormModal from '../components/AssetFormModal'
 import DeleteConfirm from '../components/DeleteConfirm'
+import BulkDeleteConfirm from '../components/BulkDeleteConfirm'
 import { useToasts } from '../lib/useToasts'
 import { ToastContainer } from '../components/Toasts'
-import { IconPlus, IconRefresh, IconDownload } from '../components/Icons'
-import { exportAssetsToExcel } from '../lib/exportExcel'
+import { IconPlus, IconRefresh, IconDownload, IconUpload, IconTrash } from '../components/Icons'
+import ExportModal from '../components/ExportModal'
+import ImportModal from '../components/ImportModal'
 
 export default function Dashboard() {
   const { userRegion, userRole } = useAuth() || {}
@@ -20,6 +22,10 @@ export default function Dashboard() {
   const [showForm, setShowForm] = useState(false)
   const [editingAsset, setEditingAsset] = useState(null)
   const [deletingAsset, setDeletingAsset] = useState(null)
+  const [bulkDeletingAssets, setBulkDeletingAssets] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [showExport, setShowExport] = useState(false)
+  const [showImport, setShowImport] = useState(false)
   const { toasts, push: toast } = useToasts()
 
   const load = useCallback(async () => {
@@ -64,9 +70,18 @@ export default function Dashboard() {
           </p>
         </div>
         {!isViewer && (
-          <button className="btn btn-primary" onClick={() => setShowForm(true)}>
-            <IconPlus /> Add Asset
-          </button>
+          <div className="header-actions" style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+            <button
+              className="btn btn-danger btn-sm"
+              onClick={() => setBulkDeletingAssets(assets.filter((a) => selectedIds.has(a.id)))}
+              disabled={selectedIds.size === 0}
+            >
+              <IconTrash /> Bulk Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+            </button>
+            <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+              <IconPlus /> Add Asset
+            </button>
+          </div>
         )}
       </header>
 
@@ -130,7 +145,13 @@ export default function Dashboard() {
           <div className="panel-actions">
             <button
               className="btn btn-ghost btn-sm"
-              onClick={() => exportAssetsToExcel(assets, 'PhilFIDA7_All_Assets')}
+              onClick={() => setShowImport(true)}
+            >
+              <IconUpload /> Import
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowExport(true)}
               disabled={assets.length === 0}
             >
               <IconDownload /> Export
@@ -145,6 +166,9 @@ export default function Dashboard() {
           loading={loading}
           onEdit={setEditingAsset}
           onDelete={setDeletingAsset}
+          onBulkDelete={!isViewer ? setBulkDeletingAssets : undefined}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
           emptyMessage='No assets yet. Click "Add Asset" to create one.'
           readonly={isViewer}
         />
@@ -153,6 +177,23 @@ export default function Dashboard() {
       {!isViewer && showForm && <AssetFormModal asset={null} userRegion={userRegion} onClose={() => setShowForm(false)} onSaved={load} toast={toast} />}
       {!isViewer && editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
       {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
+      {!isViewer && bulkDeletingAssets && (
+        <BulkDeleteConfirm
+          assets={bulkDeletingAssets}
+          onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }}
+          onDeleted={() => { load(); setSelectedIds(new Set()) }}
+          toast={toast}
+        />
+      )}
+      {showExport && <ExportModal assets={assets} onClose={() => setShowExport(false)} />}
+      {showImport && !isViewer && (
+        <ImportModal
+          userRegion={userRegion}
+          onClose={() => setShowImport(false)}
+          onImported={load}
+          toast={toast}
+        />
+      )}
       <ToastContainer toasts={toasts} />
     </>
   )

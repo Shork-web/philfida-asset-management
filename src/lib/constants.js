@@ -145,11 +145,28 @@ export const SERVICEABLE_STATUSES = ['ASSIGNED', 'SPARE']
 export const UNSERVICEABLE_STATUSES = ['OBSOLETE']
 
 export const ASSET_TAG_PREFIX = 'PFIDA-'
+export const ASSET_LIFE_YEARS = 5
+
+/**
+ * @param {number|null|undefined} yearOfAcquisition
+ * @returns {{ age: number, yearsLeft: number, forReplacement: boolean }|null}
+ */
+export function getAssetLifeInfo(yearOfAcquisition) {
+  if (yearOfAcquisition == null || yearOfAcquisition === '') return null
+  const year = Number(yearOfAcquisition)
+  if (isNaN(year)) return null
+  const currentYear = new Date().getFullYear()
+  const age = currentYear - year
+  const yearsLeft = Math.max(0, ASSET_LIFE_YEARS - age)
+  const forReplacement = age >= ASSET_LIFE_YEARS
+  return { age, yearsLeft, forReplacement }
+}
 
 export const EMPTY_FORM = {
   assetTag: '',
   newPropertyNumber: '',
   name: '',
+  description: '',
   type: 'ICT_EQUIPMENT',
   subtype: '',
   status: 'SPARE',
