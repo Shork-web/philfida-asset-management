@@ -101,7 +101,16 @@ export default function UnserviceableAssets() {
         />
       </section>
 
-      {!isViewer && editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
+      {!isViewer && editingAsset && (
+        <AssetFormModal
+          asset={editingAsset}
+          userRegion={userRegion}
+          existingAssets={allAssets}
+          onClose={() => setEditingAsset(null)}
+          onSaved={load}
+          toast={toast}
+        />
+      )}
       {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
       {!isViewer && bulkDeletingAssets && (
         <BulkDeleteConfirm assets={bulkDeletingAssets} onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }} onDeleted={() => { load(); setSelectedIds(new Set()) }} toast={toast} />

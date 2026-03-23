@@ -6,7 +6,9 @@ IT asset management system with Firebase Firestore as the database.
 
 - Dashboard with stats, search, filters, and sorting
 - Serviceable / Unserviceable asset views
+- **Duplicates** tab: lists groups of assets that share the same old property number
 - Create, edit, delete assets
+- **Issued to history:** changing **Issued to** on an existing asset (from a non-empty name) appends the previous assignee with a timestamp; shown below Remarks in the asset form
 - Collapsible sidebar with PhilFIDA branding
 - Green & orange theme
 
@@ -56,6 +58,6 @@ See **[GITHUB_SETUP.md](./GITHUB_SETUP.md)** for step-by-step instructions to cr
 - `src/lib/api.js` – Firestore CRUD
 - `src/lib/constants.js` – Types, statuses, labels
 - `src/components/` – Sidebar, table, modals, etc.
-- `src/pages/` – Dashboard, Serviceable, Unserviceable
+- `src/pages/` – Dashboard, Serviceable, Unserviceable, Duplicates
 - `firestore.rules` – Firestore security rules (deploy with `firebase deploy`)
 - `.env.example` – Template for Firebase config

@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { IconDashboard, IconCheckCircle, IconAlertTriangle, IconChevronLeft, IconCreditCard, IconQrCode, IconUsers } from './Icons'
+import { IconDashboard, IconCheckCircle, IconAlertTriangle, IconDuplicate, IconChevronLeft, IconCreditCard, IconQrCode, IconUsers } from './Icons'
 import { useAuth } from '../lib/useAuth'
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
 import './Sidebar.css'
@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { to: '/', label: 'Dashboard', icon: IconDashboard },
   { to: '/serviceable', label: 'Serviceable Assets', icon: IconCheckCircle },
   { to: '/unserviceable', label: 'Unserviceable Assets', icon: IconAlertTriangle },
+  { to: '/duplicates', label: 'Duplicates', icon: IconDuplicate },
   { to: '/subscriptions', label: 'Subscriptions', icon: IconCreditCard },
   { to: '/scan', label: 'Scan QR', icon: IconQrCode, adminOnly: true },
   { to: '/users', label: 'User Management', icon: IconUsers, superAdminOnly: true },

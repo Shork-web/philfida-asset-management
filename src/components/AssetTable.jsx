@@ -88,15 +88,16 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, onBulkDe
 
     if (search) {
       const q = search.toLowerCase()
+      const hay = (v) => String(v ?? '').toLowerCase()
       list = list.filter(
         (a) =>
-          a.assetTag.toLowerCase().includes(q) ||
-          (a.newPropertyNumber && a.newPropertyNumber.toLowerCase().includes(q)) ||
-          a.name.toLowerCase().includes(q) ||
-          (a.serialNumber && a.serialNumber.toLowerCase().includes(q)) ||
-          (a.issuedTo && a.issuedTo.toLowerCase().includes(q)) ||
-          (a.location && a.location.toLowerCase().includes(q)) ||
-          (a.subtype && a.subtype.toLowerCase().includes(q)),
+          hay(a.assetTag).includes(q) ||
+          hay(a.newPropertyNumber).includes(q) ||
+          hay(a.name).includes(q) ||
+          hay(a.serialNumber).includes(q) ||
+          hay(a.issuedTo).includes(q) ||
+          hay(a.location).includes(q) ||
+          hay(a.subtype).includes(q),
       )
     }
 

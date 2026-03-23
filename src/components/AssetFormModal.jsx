@@ -1,7 +1,18 @@
 import { useState } from 'react'
-import { createAsset, updateAsset } from '../lib/api'
+import { format, isValid, parseISO } from 'date-fns'
+import { createAsset, updateAsset, getAssetDuplicateMessages } from '../lib/api'
 import { STATUS_OPTIONS, STATUS_LABELS, TYPE_OPTIONS, TYPE_LABELS, SUBTYPE_OPTIONS, EMPTY_FORM } from '../lib/constants'
 import { IconX } from './Icons'
+
+function formatIssuedHistoryDate(iso) {
+  if (!iso) return ''
+  try {
+    const d = parseISO(iso)
+    return isValid(d) ? format(d, 'MMM d, yyyy h:mm a') : iso
+  } catch {
+    return iso
+  }
+}
 
 function FormSection({ title, children, columns = 2 }) {
   return (
@@ -14,7 +25,7 @@ function FormSection({ title, children, columns = 2 }) {
   )
 }
 
-export default function AssetFormModal({ asset, userRegion, onClose, onSaved, toast }) {
+export default function AssetFormModal({ asset, userRegion, existingAssets = [], onClose, onSaved, toast }) {
   const isEdit = Boolean(asset)
   const [form, setForm] = useState(
     asset
@@ -75,6 +86,18 @@ export default function AssetFormModal({ asset, userRegion, onClose, onSaved, to
       quantityPerPhysicalCount: form.quantityPerPhysicalCount ? Number(form.quantityPerPhysicalCount) : null,
       notes: form.notes.trim() || null,
       ...(isEdit ? {} : { region: userRegion && userRegion !== 'all' ? userRegion : null }),
+    }
+
+    const dupMsgs = getAssetDuplicateMessages(payload, existingAssets, isEdit ? asset.id : undefined)
+    if (dupMsgs.length > 0) {
+      toast(
+        dupMsgs.length === 1
+          ? dupMsgs[0]
+          : `Duplicate entries:\n${dupMsgs.map((m) => `• ${m}`).join('\n')}`,
+        'error',
+      )
+      setSaving(false)
+      return
     }
 
     try {
@@ -199,6 +222,35 @@ export default function AssetFormModal({ asset, userRegion, onClose, onSaved, to
               <div className="form-group">
                 <textarea id="af-notes" name="notes" rows="2" placeholder="e.g. POOR condition, good condition, bad condition" value={form.notes} onChange={onChange} />
               </div>
+            </div>
+
+            {/* ── Issued to history (read-only; updated when Issued to changes on save) ── */}
+            <div className="af-section">
+              <p className="af-section-title">Issued to history</p>
+              {!isEdit && (
+                <p className="af-history-empty">
+                  After this asset is saved, each time you change <strong>Issued to</strong> and save, the previous name is
+                  recorded here (newest first).
+                </p>
+              )}
+              {isEdit && (!asset.issuedToHistory || asset.issuedToHistory.length === 0) && (
+                <p className="af-history-empty">
+                  No previous assignees yet. When you change <strong>Issued to</strong> from a non-empty name and save, the
+                  prior name will appear here.
+                </p>
+              )}
+              {isEdit && asset.issuedToHistory && asset.issuedToHistory.length > 0 && (
+                <ul className="af-issued-history-list">
+                  {asset.issuedToHistory.map((entry, idx) => (
+                    <li key={`${entry.name}-${entry.changedAt}-${idx}`} className="af-issued-history-item">
+                      <span className="af-issued-history-name">{entry.name}</span>
+                      <span className="af-issued-history-meta">
+                        {entry.changedAt ? formatIssuedHistoryDate(entry.changedAt) : '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
 
           </div>

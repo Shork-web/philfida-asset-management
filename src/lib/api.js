@@ -22,6 +22,26 @@ function sortByCreatedAtDesc(docs) {
 }
 import { getDb, ASSETS_COLLECTION } from './firebase'
 
+/** @param {unknown} raw */
+export function normalizeIssuedToHistory(raw) {
+  if (!Array.isArray(raw)) return []
+  const out = []
+  for (const e of raw) {
+    if (!e || typeof e !== 'object') continue
+    const name = typeof e.name === 'string' ? e.name.trim() : ''
+    if (!name) continue
+    let changedAt = ''
+    const ca = e.changedAt
+    if (ca instanceof Timestamp) changedAt = ca.toDate().toISOString()
+    else if (typeof ca === 'string') changedAt = ca
+    else if (ca && typeof ca.toDate === 'function') changedAt = ca.toDate().toISOString()
+    out.push({ name, changedAt })
+  }
+  return out
+}
+
+const ISSUED_TO_HISTORY_MAX = 50
+
 function toAssetData(docSnap) {
   if (!docSnap.exists()) return null
   const d = docSnap.data()
@@ -36,6 +56,7 @@ function toAssetData(docSnap) {
     status: d.status ?? 'SPARE',
     serialNumber: d.serialNumber ?? null,
     issuedTo: d.issuedTo ?? null,
+    issuedToHistory: normalizeIssuedToHistory(d.issuedToHistory),
     location: d.location ?? null,
     yearOfAcquisition: d.yearOfAcquisition ?? null,
     value: d.value ?? null,
@@ -52,6 +73,131 @@ function fromTimestamp(ts) {
   if (ts instanceof Timestamp) return ts.toDate().toISOString()
   if (ts?.toDate) return ts.toDate().toISOString()
   return ts ?? null
+}
+
+/** Normalize for duplicate comparison (trim + lowercase). */
+export function normalizeAssetIdentifier(value) {
+  if (value == null || value === '') return ''
+  return String(value).trim().toLowerCase()
+}
+
+/**
+ * Detect duplicate serial / old (assetTag) / new property numbers vs existing assets.
+ * @param {{ newPropertyNumber?: string|null, assetTag?: string|null, serialNumber?: string|null }} payload
+ * @param {Array<{ id: string, name?: string, newPropertyNumber?: string|null, assetTag?: string|null, serialNumber?: string|null }>} existingAssets
+ * @param {string} [excludeId] - When editing, skip this document id
+ * @returns {string[]} Human-readable messages (empty if no conflicts)
+ */
+export function getAssetDuplicateMessages(payload, existingAssets, excludeId) {
+  const npn = normalizeAssetIdentifier(payload.newPropertyNumber)
+  const oldPn = normalizeAssetIdentifier(payload.assetTag)
+  const sn = normalizeAssetIdentifier(payload.serialNumber)
+
+  const messages = []
+  const seen = new Set()
+
+  for (const other of existingAssets || []) {
+    if (!other?.id || (excludeId && other.id === excludeId)) continue
+
+    if (npn && normalizeAssetIdentifier(other.newPropertyNumber) === npn) {
+      const key = `npn:${npn}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        const label = other.name || 'another asset'
+        const disp = other.newPropertyNumber || npn
+        messages.push(
+          `New Property Number "${payload.newPropertyNumber?.trim() || disp}" is already assigned to "${label}" (New Prop: ${disp}).`,
+        )
+      }
+    }
+    if (oldPn && normalizeAssetIdentifier(other.assetTag) === oldPn) {
+      const key = `old:${oldPn}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        const label = other.name || 'another asset'
+        const disp = other.assetTag || oldPn
+        messages.push(
+          `Old Property Number "${payload.assetTag?.trim() || disp}" is already assigned to "${label}".`,
+        )
+      }
+    }
+    if (sn && normalizeAssetIdentifier(other.serialNumber) === sn) {
+      const key = `sn:${sn}`
+      if (!seen.has(key)) {
+        seen.add(key)
+        const label = other.name || 'another asset'
+        const disp = other.serialNumber || sn
+        messages.push(
+          `Serial Number "${payload.serialNumber?.trim() || disp}" is already used by "${label}".`,
+        )
+      }
+    }
+  }
+
+  return messages
+}
+
+const DUPLICATE_FIELD_META = [
+  { key: 'newPropertyNumber', label: 'New Property Number' },
+  { key: 'assetTag', label: 'Old Property Number' },
+  { key: 'serialNumber', label: 'Serial Number' },
+]
+
+const DUPLICATE_FIELD_ORDER = { newPropertyNumber: 0, assetTag: 1, serialNumber: 2 }
+
+/**
+ * Groups assets that share the same normalized new property number, old property number, or serial.
+ * @param {Array<Record<string, unknown>>} assets
+ * @returns {Array<{ id: string, field: string, fieldLabel: string, displayValue: string, assets: object[] }>}
+ */
+export function findAssetDuplicateGroups(assets) {
+  const groups = []
+  for (const meta of DUPLICATE_FIELD_META) {
+    /** @type {Map<string, { displayValue: string, items: object[] }>} */
+    const map = new Map()
+    for (const a of assets || []) {
+      const norm = normalizeAssetIdentifier(a[meta.key])
+      if (!norm) continue
+      let bucket = map.get(norm)
+      if (!bucket) {
+        bucket = { displayValue: String(a[meta.key] ?? '').trim() || norm, items: [] }
+        map.set(norm, bucket)
+      }
+      bucket.items.push(a)
+    }
+    for (const [norm, bucket] of map) {
+      if (bucket.items.length > 1) {
+        groups.push({
+          id: `${meta.key}:${norm}`,
+          field: meta.key,
+          fieldLabel: meta.label,
+          displayValue: bucket.displayValue,
+          assets: [...bucket.items],
+        })
+      }
+    }
+  }
+  groups.sort((ga, gb) => {
+    const oa = DUPLICATE_FIELD_ORDER[ga.field] ?? 99
+    const ob = DUPLICATE_FIELD_ORDER[gb.field] ?? 99
+    if (oa !== ob) return oa - ob
+    return String(ga.displayValue).localeCompare(String(gb.displayValue), undefined, { numeric: true })
+  })
+  return groups
+}
+
+/**
+ * Unique asset document ids that appear in at least one duplicate group.
+ * @param {ReturnType<typeof findAssetDuplicateGroups>} groups
+ */
+export function getUniqueAssetIdsInDuplicateGroups(groups) {
+  const ids = new Set()
+  for (const g of groups) {
+    for (const a of g.assets) {
+      if (a?.id) ids.add(a.id)
+    }
+  }
+  return ids
 }
 
 /**
@@ -79,6 +225,7 @@ export async function fetchAssets(region) {
       assignedTo: data.assignedTo ?? null,
       purchaseDate: data.purchaseDate ?? null,
       notes: data.notes ?? null,
+      issuedToHistory: normalizeIssuedToHistory(data.issuedToHistory),
       region: data.region ?? null,
       createdAt: fromTimestamp(data.createdAt),
       updatedAt: fromTimestamp(data.updatedAt),
@@ -120,6 +267,7 @@ export async function createAsset(payload) {
     status: payload.status ?? 'SPARE',
     serialNumber: payload.serialNumber ?? null,
     issuedTo: payload.issuedTo ?? null,
+    issuedToHistory: [],
     location: payload.location ?? null,
     yearOfAcquisition: payload.yearOfAcquisition ?? null,
     value: payload.value ?? null,
@@ -137,8 +285,26 @@ export async function createAsset(payload) {
 export async function updateAsset(id, payload) {
   const db = getDb()
   const ref = doc(db, ASSETS_COLLECTION, id)
+  const prevSnap = await getDoc(ref)
+  if (!prevSnap.exists()) {
+    throw new Error('Asset not found')
+  }
+  const prev = prevSnap.data()
+  const prevIssued = String(prev.issuedTo ?? '').trim()
+  const { issuedToHistory: _discardHistory, ...rest } = payload
+  const nextIssued = String(rest.issuedTo ?? '').trim()
+
+  let history = normalizeIssuedToHistory(prev.issuedToHistory)
+  if (prevIssued !== nextIssued && prevIssued !== '') {
+    history = [
+      { name: prevIssued, changedAt: new Date().toISOString() },
+      ...history,
+    ].slice(0, ISSUED_TO_HISTORY_MAX)
+  }
+
   await updateDoc(ref, {
-    ...payload,
+    ...rest,
+    issuedToHistory: history,
     updatedAt: serverTimestamp(),
   })
   const snap = await getDoc(ref)

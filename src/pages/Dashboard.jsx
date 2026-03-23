@@ -174,8 +174,26 @@ export default function Dashboard() {
         />
       </section>
 
-      {!isViewer && showForm && <AssetFormModal asset={null} userRegion={userRegion} onClose={() => setShowForm(false)} onSaved={load} toast={toast} />}
-      {!isViewer && editingAsset && <AssetFormModal asset={editingAsset} userRegion={userRegion} onClose={() => setEditingAsset(null)} onSaved={load} toast={toast} />}
+      {!isViewer && showForm && (
+        <AssetFormModal
+          asset={null}
+          userRegion={userRegion}
+          existingAssets={assets}
+          onClose={() => setShowForm(false)}
+          onSaved={load}
+          toast={toast}
+        />
+      )}
+      {!isViewer && editingAsset && (
+        <AssetFormModal
+          asset={editingAsset}
+          userRegion={userRegion}
+          existingAssets={assets}
+          onClose={() => setEditingAsset(null)}
+          onSaved={load}
+          toast={toast}
+        />
+      )}
       {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
       {!isViewer && bulkDeletingAssets && (
         <BulkDeleteConfirm
@@ -189,6 +207,7 @@ export default function Dashboard() {
       {showImport && !isViewer && (
         <ImportModal
           userRegion={userRegion}
+          existingAssets={assets}
           onClose={() => setShowImport(false)}
           onImported={load}
           toast={toast}

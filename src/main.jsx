@@ -10,6 +10,7 @@ import Login from './pages/Login.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import ServiceableAssets from './pages/ServiceableAssets.jsx'
 import UnserviceableAssets from './pages/UnserviceableAssets.jsx'
+import Duplicates from './pages/Duplicates.jsx'
 import Subscriptions from './pages/Subscriptions.jsx'
 import ScanQR from './pages/ScanQR.jsx'
 import UserManagement from './pages/UserManagement.jsx'
@@ -38,6 +39,7 @@ createRoot(document.getElementById('root')).render(
             <Route index element={<Dashboard />} />
             <Route path="serviceable" element={<ServiceableAssets />} />
             <Route path="unserviceable" element={<UnserviceableAssets />} />
+            <Route path="duplicates" element={<Duplicates />} />
             <Route path="subscriptions" element={<Subscriptions />} />
             <Route path="scan" element={<ScanQR />} />
             <Route path="users" element={<UserManagement />} />
