@@ -2,9 +2,10 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../lib/useAuth'
 import { getAllUsers, updateUserProfileAdmin, deleteUserDocument } from '../lib/userProfile'
+import { sendPasswordResetToEmail } from '../lib/passwordReset'
 import { useToasts } from '../lib/useToasts'
 import { ToastContainer } from '../components/Toasts'
-import { IconRefresh, IconEdit, IconTrash, IconX, IconUser } from '../components/Icons'
+import { IconRefresh, IconEdit, IconTrash, IconX, IconUser, IconKey } from '../components/Icons'
 
 const REGIONS = [
   { value: '1', label: 'Region 1' },
@@ -28,11 +29,6 @@ const ROLES = [
   { value: 'viewer', label: 'Viewer' },
 ]
 
-function regionLabel(r) {
-  if (!r || r === 'all') return 'All Regions'
-  return `Region ${r}`
-}
-
 function RoleBadge({ role }) {
   if (role === 'viewer') return <span className="um-badge um-badge-viewer">Viewer</span>
   if (role === 'admin') return <span className="um-badge um-badge-admin">Admin</span>
@@ -52,8 +48,80 @@ function Initials({ name, email }) {
   return <span className="um-avatar">{letters || '?'}</span>
 }
 
+/* ── Password reset (Firebase email link) ── */
+function ResetPasswordModal({ user, onClose, pushToast }) {
+  const [sending, setSending] = useState(false)
+  const email = (user?.email || '').trim()
+  const canSend = Boolean(email)
+
+  const handleSend = async () => {
+    if (!canSend) return
+    setSending(true)
+    try {
+      await sendPasswordResetToEmail(email)
+      pushToast(`Password reset email sent to ${email}.`, 'success')
+      onClose()
+    } catch (err) {
+      pushToast(err?.message || 'Failed to send reset email.', 'error')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="modal-overlay" onClick={sending ? () => {} : onClose}>
+      <div className="modal-content" style={{ maxWidth: 440 }} onClick={(e) => e.stopPropagation()}>
+        <div className="modal-header">
+          <h2 className="modal-title">Reset password</h2>
+          <button type="button" className="modal-close" onClick={onClose} disabled={sending}><IconX /></button>
+        </div>
+        <div className="modal-body">
+          <div className="um-edit-user-info">
+            <Initials name={user.displayName} email={user.email} />
+            <div>
+              <p className="um-edit-name">{user.displayName || '(no name)'}</p>
+              <p className="um-edit-email">{email || 'No email on file'}</p>
+            </div>
+          </div>
+          {canSend ? (
+            <p className="um-reset-hint">
+              Firebase will send <strong>{email}</strong> a secure link to choose a new password. The link expires after a
+              short time. This is the supported way to reset passwords without a backend server.
+            </p>
+          ) : (
+            <p className="um-delete-warning">
+              This profile has no email address. Add an email in Firebase Authentication (Console) or ask the user to
+              recover their account there.
+            </p>
+          )}
+        </div>
+        <div className="modal-footer">
+          <button type="button" className="btn btn-ghost" onClick={onClose} disabled={sending}>Cancel</button>
+          <button
+            type="button"
+            className="btn btn-primary um-send-reset-primary"
+            onClick={handleSend}
+            disabled={sending || !canSend}
+          >
+            {sending ? (
+              <>
+                <span className="auth-spinner" />
+                Sending…
+              </>
+            ) : (
+              <>
+                <IconKey /> Send reset email
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 /* ── Edit modal ── */
-function EditModal({ user, currentUserId, onClose, onSave }) {
+function EditModal({ user, currentUserId, onClose, onSave, onOpenPasswordReset }) {
   const [role, setRole] = useState(user.role)
   const [region, setRegion] = useState(user.region)
   const [saving, setSaving] = useState(false)
@@ -105,6 +173,25 @@ function EditModal({ user, currentUserId, onClose, onSave }) {
                 <option key={r.value} value={r.value}>{r.label}</option>
               ))}
             </select>
+          </div>
+
+          <div className="um-password-reset-section">
+            <p className="um-password-reset-title">Password</p>
+            <p className="um-password-reset-desc">
+              Send a Firebase password-reset link to this user&apos;s email. They set a new password from the link.
+            </p>
+            <button
+              type="button"
+              className="btn btn-ghost um-password-reset-btn"
+              onClick={() => {
+                onClose()
+                onOpenPasswordReset(user)
+              }}
+              disabled={!user.email?.trim()}
+              title={!user.email?.trim() ? 'No email on file for this account' : 'Send password reset email'}
+            >
+              <IconKey /> Send password reset email…
+            </button>
           </div>
         </div>
         <div className="modal-footer">
@@ -185,9 +272,9 @@ function DeleteModal({ user, currentUserId, onClose, onConfirm }) {
 
 /* ── Main page ── */
 export default function UserManagement() {
-  const { user, userRole, userRegion } = useAuth()
+  const { user, userRegion } = useAuth()
   const navigate = useNavigate()
-  const { toasts, addToast, removeToast } = useToasts()
+  const { toasts, push } = useToasts()
 
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
@@ -199,6 +286,7 @@ export default function UserManagement() {
 
   const [editingUser, setEditingUser] = useState(null)
   const [deletingUser, setDeletingUser] = useState(null)
+  const [resetPasswordUser, setResetPasswordUser] = useState(null)
 
   const isSuperAdmin = userRegion === 'all'
 
@@ -231,10 +319,10 @@ export default function UserManagement() {
   const handleSave = async (uid, updates) => {
     try {
       await updateUserProfileAdmin(uid, updates)
-      addToast({ type: 'success', message: 'Account updated successfully.' })
+      push('Account updated successfully.', 'success')
       setUsers((prev) => prev.map((u) => u.uid === uid ? { ...u, ...updates } : u))
     } catch (err) {
-      addToast({ type: 'error', message: err?.message || 'Failed to update account.' })
+      push(err?.message || 'Failed to update account.', 'error')
       throw err
     }
   }
@@ -242,11 +330,11 @@ export default function UserManagement() {
   const handleDelete = async (uid) => {
     try {
       await deleteUserDocument(uid)
-      addToast({ type: 'success', message: 'Account deleted.' })
+      push('Account deleted.', 'success')
       await loadUsers(true) // Silent refresh — no full-page loading spinner
       setDeletingUser(null) // Close modal after list has refreshed
     } catch (err) {
-      addToast({ type: 'error', message: err?.message || 'Failed to delete account.' })
+      push(err?.message || 'Failed to delete account.', 'error')
       throw err
     }
   }
@@ -263,12 +351,12 @@ export default function UserManagement() {
 
   return (
     <>
-      <ToastContainer toasts={toasts} onRemove={removeToast} />
+      <ToastContainer toasts={toasts} />
 
       <header className="page-header">
         <div>
           <h1>User Management</h1>
-          <p>View, edit roles, and remove accounts. Changes take effect immediately.</p>
+          <p>View, edit roles, send password-reset emails, and remove accounts. Changes take effect immediately.</p>
         </div>
         <div className="page-header-actions">
           <button type="button" className="btn btn-ghost" onClick={loadUsers} disabled={loading}>
@@ -384,6 +472,15 @@ export default function UserManagement() {
                         </button>
                         <button
                           type="button"
+                          className="btn-icon-sm"
+                          title={u.email?.trim() ? 'Send password reset email' : 'No email on file'}
+                          onClick={() => setResetPasswordUser(u)}
+                          disabled={!u.email?.trim()}
+                        >
+                          <IconKey />
+                        </button>
+                        <button
+                          type="button"
                           className="btn-icon-sm btn-icon-danger"
                           title={isSelf ? 'Cannot delete your own account' : 'Delete account'}
                           onClick={() => setDeletingUser(u)}
@@ -407,6 +504,15 @@ export default function UserManagement() {
           currentUserId={user?.uid}
           onClose={() => setEditingUser(null)}
           onSave={handleSave}
+          onOpenPasswordReset={setResetPasswordUser}
+        />
+      )}
+
+      {resetPasswordUser && (
+        <ResetPasswordModal
+          user={resetPasswordUser}
+          onClose={() => setResetPasswordUser(null)}
+          pushToast={push}
         />
       )}
 

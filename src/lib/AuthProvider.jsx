@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from './firebase'
 import { AuthContext } from './authContext'
-import { getUserProfile } from './userProfile'
+import { getUserProfileWithCreationGrace } from './userProfile'
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -18,7 +18,7 @@ export function AuthProvider({ children }) {
         setUser(firebaseUser)
         if (firebaseUser) {
           try {
-            const profile = await getUserProfile(firebaseUser.uid)
+            const profile = await getUserProfileWithCreationGrace(firebaseUser.uid)
             if (!profile) {
               // No profile = account was deleted by admin. Sign out immediately.
               await signOut(getFirebaseAuth())

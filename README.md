@@ -4,6 +4,7 @@ IT asset management system with Firebase Firestore as the database.
 
 ## Features
 
+- **User management (super admin):** send **password reset emails** to regional admins and other users via Firebase (reset link by email)
 - Dashboard with stats, search, filters, and sorting
 - Serviceable / Unserviceable asset views
 - **Duplicates** tab: lists groups of assets that share the same old property number

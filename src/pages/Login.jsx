@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
@@ -13,6 +13,9 @@ import { isSignUpEnabled, isViewerSignupEnabled, resolveRegionFromKey, resolveRe
 import { setUserProfile } from '../lib/userProfile'
 
 import philfidaLogo from '../assets/PhilFIDA_Logo.png'
+import { useToasts } from '../lib/useToasts'
+import { ToastContainer } from '../components/Toasts'
+import '../App.css'
 
 function validateEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test((value || '').trim())
@@ -37,7 +40,8 @@ function isPasswordStrong(password) {
   return s.length && s.upper && s.lower && s.number && s.special
 }
 
-function friendlyError(code) {
+function friendlyError(errOrCode) {
+  const code = typeof errOrCode === 'string' ? errOrCode : errOrCode?.code
   const map = {
     'auth/invalid-email':                          'Please enter a valid email address.',
     'auth/user-not-found':                         'No account found with this email.',
@@ -54,7 +58,11 @@ function friendlyError(code) {
     'auth/account-exists-with-different-credential': 'An account exists with this email using a different method.',
     'auth/credential-already-in-use':              'This credential is already linked to another account.',
     'auth/unauthorized-domain':                    'This domain is not authorised for sign-in. Add it in Firebase Console → Authentication → Authorized domains.',
+    'auth/user-disabled':                          'This account has been disabled. Contact your administrator.',
   }
+  if (code && map[code]) return map[code]
+  const msg = errOrCode && typeof errOrCode === 'object' && typeof errOrCode.message === 'string' && errOrCode.message.trim()
+  if (msg) return errOrCode.message.trim()
   return map[code] || `Something went wrong (${code || 'unknown'}). Please try again.`
 }
 
@@ -192,6 +200,14 @@ export default function Login() {
   const [googleLoading, setGoogleLoading] = useState(false)
   const [resetLoading, setResetLoading] = useState(false)
 
+  const { toasts, push: toastPush } = useToasts()
+  const errorBannerRef = useRef(null)
+
+  useEffect(() => {
+    if (!error) return
+    errorBannerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+  }, [error])
+
   const isSignUp = tab === 'signup'
   const signUpAllowed = isSignUpEnabled()
   const VIEWER_SIGNUP_ENABLED = isViewerSignupEnabled()
@@ -214,6 +230,29 @@ export default function Login() {
     setShowConfirmPassword(false)
     setPassword('')
     setEmail('')
+  }
+
+  /** After sign-up: sign out (Firebase auto-logs in on create) and show Sign In. */
+  const finishSignUpAndShowSignIn = async (message, preserveEmail = '') => {
+    try {
+      await signOut(getFirebaseAuth())
+    } catch {
+      /* ignore */
+    }
+    setPassword('')
+    setConfirmPassword('')
+    setDisplayName('')
+    setMasterKey('')
+    setViewerKey('')
+    setShowMasterKey(false)
+    setShowViewerKey(false)
+    setShowPassword(false)
+    setShowConfirmPassword(false)
+    setIsViewerMode(false)
+    setError('')
+    setTab('signin')
+    setEmail(preserveEmail)
+    setSuccess(message)
   }
 
   const openReset = () => {
@@ -256,30 +295,52 @@ export default function Login() {
               displayName: result.user.displayName ?? null,
               email: result.user.email ?? null,
             })
+            await finishSignUpAndShowSignIn(
+              'Account created. Please sign in with Google to continue.',
+              result.user.email || '',
+            )
           } catch (err) {
             console.error('Could not save viewer profile:', err?.message)
+            try {
+              await signOut(getFirebaseAuth())
+            } catch { /* ignore */ }
             setError('Signed in with Google, but your profile could not be saved. Check Firestore rules.')
           }
         } else {
           const region = resolveRegionFromKey(masterKey)
-          if (region) {
+          if (!region) {
+            console.error('[Sign-up] Region missing after Google auth (admin)')
             try {
-              await setUserProfile(result.user.uid, {
-                region,
-                role: 'admin',
-                displayName: result.user.displayName ?? null,
-                email: result.user.email ?? null,
-              })
-            } catch (profileErr) {
-              console.error('Could not save user region profile:', profileErr?.message)
-              setError('Signed in with Google, but your region could not be saved — Firestore rules may not be deployed yet.')
-              return
-            }
+              await signOut(getFirebaseAuth())
+            } catch { /* ignore */ }
+            setError('Could not determine your region. Please try signing up again.')
+            return
+          }
+          try {
+            await setUserProfile(result.user.uid, {
+              region,
+              role: 'admin',
+              displayName: result.user.displayName ?? null,
+              email: result.user.email ?? null,
+            })
+            await finishSignUpAndShowSignIn(
+              'Account created. Please sign in with Google to continue.',
+              result.user.email || '',
+            )
+          } catch (profileErr) {
+            console.error('Could not save user region profile:', profileErr?.message)
+            try {
+              await signOut(getFirebaseAuth())
+            } catch { /* ignore */ }
+            setError('Signed in with Google, but your region could not be saved — Firestore rules may not be deployed yet.')
+            return
           }
         }
       }
     } catch (err) {
-      setError(friendlyError(err.code))
+      const msg = friendlyError(err)
+      setError(msg)
+      if (!isSignUp) toastPush(msg, 'error')
     } finally {
       setGoogleLoading(false)
     }
@@ -312,6 +373,7 @@ export default function Login() {
       if (isSignUp) {
         const cred = await createUserWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
         if (displayName.trim()) await updateProfile(cred.user, { displayName: displayName.trim() })
+        const emailSaved = cred.user.email ?? email.trim()
         if (isViewerMode) {
           const viewerRegion = resolveRegionFromViewerKey(viewerKey)
           try {
@@ -321,33 +383,55 @@ export default function Login() {
               displayName: displayName.trim() || null,
               email: cred.user.email ?? null,
             })
+            await finishSignUpAndShowSignIn(
+              'Account created. Please sign in with your email and password.',
+              emailSaved,
+            )
           } catch (profileErr) {
             console.error('Could not save viewer profile:', profileErr?.message)
+            try {
+              await signOut(getFirebaseAuth())
+            } catch { /* ignore */ }
             setError('Account created, but your profile could not be saved — Firestore rules may not be deployed yet.')
             return
           }
         } else {
           const region = resolveRegionFromKey(masterKey)
-          if (region) {
+          if (!region) {
+            console.error('[Sign-up] Region missing after validation (admin email)')
             try {
-              await setUserProfile(cred.user.uid, {
-                region,
-                role: 'admin',
-                displayName: displayName.trim() || null,
-                email: cred.user.email ?? null,
-              })
-            } catch (profileErr) {
-              console.error('Could not save user region profile:', profileErr?.message)
-              setError('Account created, but your region could not be saved — Firestore rules may not be deployed yet.')
-              return
-            }
+              await signOut(getFirebaseAuth())
+            } catch { /* ignore */ }
+            setError('Could not determine your region. Please try again or contact your administrator.')
+            return
+          }
+          try {
+            await setUserProfile(cred.user.uid, {
+              region,
+              role: 'admin',
+              displayName: displayName.trim() || null,
+              email: cred.user.email ?? null,
+            })
+            await finishSignUpAndShowSignIn(
+              'Account created. Please sign in with your email and password.',
+              emailSaved,
+            )
+          } catch (profileErr) {
+            console.error('Could not save user region profile:', profileErr?.message)
+            try {
+              await signOut(getFirebaseAuth())
+            } catch { /* ignore */ }
+            setError('Account created, but your region could not be saved — Firestore rules may not be deployed yet.')
+            return
           }
         }
       } else {
         await signInWithEmailAndPassword(getFirebaseAuth(), email.trim(), password)
       }
     } catch (err) {
-      setError(friendlyError(err.code))
+      const msg = friendlyError(err)
+      setError(msg)
+      if (!isSignUp) toastPush(msg, 'error')
     } finally {
       setLoading(false)
     }
@@ -363,7 +447,7 @@ export default function Login() {
       setSuccess('Reset link sent! Check your inbox (and spam folder).')
       setResetEmail('')
     } catch (err) {
-      setError(friendlyError(err.code))
+      setError(friendlyError(err))
     } finally {
       setResetLoading(false)
     }
@@ -378,6 +462,7 @@ export default function Login() {
 
   return (
     <div className="auth-page">
+      <ToastContainer toasts={toasts} />
 
       {/* ── Left branding panel ── */}
       <div className="auth-panel-left">
@@ -453,7 +538,11 @@ export default function Login() {
                 <p>We'll send a reset link to your email</p>
               </div>
 
-              {error && <div className="auth-alert auth-alert-error"><IconAlert />{error}</div>}
+              {error && (
+                <div ref={errorBannerRef} className="auth-alert auth-alert-error" role="alert" aria-live="assertive">
+                  <IconAlert />{error}
+                </div>
+              )}
               {success && <div className="auth-alert auth-alert-success"><IconSuccess />{success}</div>}
 
               <form className="auth-form" onSubmit={onResetPassword}>
@@ -480,6 +569,13 @@ export default function Login() {
                   ? isViewerMode ? 'Enter your viewer key to get view-only access' : 'Register with your region master key'
                   : 'Sign in to your dashboard'}</p>
               </div>
+
+              {error && (
+                <div ref={errorBannerRef} className="auth-alert auth-alert-error" role="alert" aria-live="assertive">
+                  <IconAlert />{error}
+                </div>
+              )}
+              {success && <div className="auth-alert auth-alert-success"><IconSuccess />{success}</div>}
 
               {/* Tab switcher */}
               <div className="auth-tabs">
@@ -512,9 +608,6 @@ export default function Login() {
                   )}
                 </div>
               )}
-
-              {error && <div className="auth-alert auth-alert-error"><IconAlert />{error}</div>}
-              {success && <div className="auth-alert auth-alert-success"><IconSuccess />{success}</div>}
 
               {/* Master key — only for regional admin sign-up */}
               {isSignUp && !isViewerMode && signUpAllowed && (

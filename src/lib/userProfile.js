@@ -23,6 +23,21 @@ export async function getUserProfile(uid) {
 }
 
 /**
+ * Same as getUserProfile but retries briefly. New accounts sign in before Firestore
+ * `/users/{uid}` exists; AuthProvider must not sign them out while Login.jsx is still writing.
+ */
+export async function getUserProfileWithCreationGrace(uid, options = {}) {
+  const maxAttempts = options.maxAttempts ?? 15
+  const delayMs = options.delayMs ?? 200
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, delayMs))
+    const profile = await getUserProfile(uid)
+    if (profile) return profile
+  }
+  return null
+}
+
+/**
  * Set (or create) the user's profile.
  * @param {string} uid - Firebase Auth UID
  * @param {{ region: string, role?: string, displayName?: string, email?: string }} data
