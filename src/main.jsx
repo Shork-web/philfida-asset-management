@@ -14,6 +14,7 @@ import Duplicates from './pages/Duplicates.jsx'
 import Subscriptions from './pages/Subscriptions.jsx'
 import ScanQR from './pages/ScanQR.jsx'
 import UserManagement from './pages/UserManagement.jsx'
+import PublicAssetView from './pages/PublicAssetView.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
@@ -21,6 +22,7 @@ createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <AuthProvider>
         <Routes>
+          <Route path="/a/:assetId" element={<PublicAssetView />} />
           <Route
             path="/login"
             element={

@@ -1,11 +1,10 @@
 import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
-import { getAssetQRPayload } from '../lib/assetQRPayload'
+import { getAssetPublicPageUrl, getAssetQRPayload } from '../lib/assetQRPayload'
 import { IconX } from './Icons'
 
-// Larger canvas + low ECC: fewer, bigger modules — easier for phone cameras (payload is tiny JSON).
 const QR_SIZE = 360
-const QR_OPTIONS = { width: QR_SIZE, margin: 3, errorCorrectionLevel: 'L' }
+const QR_BASE_OPTIONS = { width: QR_SIZE, margin: 3, errorCorrectionLevel: 'L' }
 
 // Render QR + name + issued-to onto a canvas, return as data URL
 async function buildLabeledQR(asset, qrDataUrl) {
@@ -77,7 +76,12 @@ export default function AssetQRModal({ asset, onClose }) {
     if (!asset) return
     const payload = getAssetQRPayload(asset)
     if (!payload) { setError('Asset has no ID'); return }
-    QRCode.toDataURL(payload, QR_OPTIONS)
+    const qrOptions = {
+      ...QR_BASE_OPTIONS,
+      // URLs are longer than JSON; slightly higher ECC helps damaged prints.
+      errorCorrectionLevel: payload.length > 72 ? 'M' : 'L',
+    }
+    QRCode.toDataURL(payload, qrOptions)
       .then(async (url) => {
         setQrUrl(url)
         try {
@@ -106,6 +110,7 @@ export default function AssetQRModal({ asset, onClose }) {
   }
 
   const displayLabel = asset?.assetTag || asset?.name || 'Asset'
+  const publicUrl = asset ? getAssetPublicPageUrl(asset) : ''
 
   return (
     <div className="overlay" onMouseDown={onClose}>
@@ -142,7 +147,18 @@ export default function AssetQRModal({ asset, onClose }) {
                 )}
               </div>
 
-              <p className="asset-qr-hint">Scan in this app to load the latest asset record. The PNG adds name and issued-to below the code for humans only.</p>
+              <p className="asset-qr-hint">
+                {publicUrl
+                  ? <>Opens a read-only asset page in the browser. In-app scan still works. Set <code className="asset-qr-code-inline">VITE_PUBLIC_APP_URL</code> for production so links match your live site.</>
+                  : <>No public base URL — QR encodes JSON for in-app scanning only. Set <code className="asset-qr-code-inline">VITE_PUBLIC_APP_URL</code> to use shareable links.</>}
+                {' '}The PNG adds name and issued-to under the code for humans only.
+              </p>
+              {publicUrl && (
+                <p className="asset-qr-url-line" title={publicUrl}>
+                  <span className="asset-qr-url-label">Link</span>
+                  <span className="asset-qr-url-text">{publicUrl}</span>
+                </p>
+              )}
             </div>
           )}
         </div>

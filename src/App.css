@@ -1584,13 +1584,275 @@ tbody tr:hover {
   font-size: 0.75rem;
   color: var(--color-gray-400);
   text-align: center;
-  max-width: 280px;
+  max-width: 320px;
+  line-height: 1.45;
+}
+
+.asset-qr-code-inline {
+  font-size: 0.68rem;
+  padding: 0.1rem 0.25rem;
+  border-radius: 4px;
+  background: var(--color-gray-100);
+  color: var(--color-gray-800);
+  word-break: break-all;
+}
+
+.asset-qr-url-line {
+  margin: 0.5rem 0 0;
+  font-size: 0.68rem;
+  color: var(--color-gray-500);
+  text-align: left;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  align-items: stretch;
+}
+
+.asset-qr-url-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.6rem;
+  color: var(--color-gray-400);
+}
+
+.asset-qr-url-text {
+  word-break: break-all;
+  font-family: ui-monospace, monospace;
+  color: var(--color-gray-700);
 }
 
 .asset-qr-error {
   color: var(--color-danger, #dc2626);
   font-size: 0.9rem;
   margin: 0;
+}
+
+/* ── Public asset page (QR link /a/:id, no app shell) ── */
+.public-asset-page {
+  min-height: 100vh;
+  background: linear-gradient(165deg, #f0fdf4 0%, #f8fafc 45%, #fff 100%);
+  color: var(--color-gray-900, #111827);
+}
+
+.public-asset-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-gray-200);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(8px);
+}
+
+.public-asset-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.public-asset-brand-mark {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #166534, #15803d);
+  box-shadow: 0 2px 8px rgba(22, 101, 52, 0.25);
+}
+
+.public-asset-brand-title {
+  margin: 0;
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #14532d;
+  letter-spacing: -0.02em;
+}
+
+.public-asset-brand-sub {
+  margin: 0.1rem 0 0;
+  font-size: 0.78rem;
+  color: var(--color-gray-500);
+}
+
+.public-asset-signin-link {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary, #166534);
+  text-decoration: none;
+  padding: 0.4rem 0.75rem;
+  border-radius: var(--radius, 8px);
+  border: 1px solid rgba(22, 101, 52, 0.25);
+  background: #fff;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.public-asset-signin-link:hover {
+  background: #f0fdf4;
+  border-color: rgba(22, 101, 52, 0.45);
+}
+
+.public-asset-main {
+  max-width: 560px;
+  margin: 0 auto;
+  padding: 1.5rem 1.25rem 2.5rem;
+}
+
+.public-asset-state {
+  text-align: center;
+  padding: 2.5rem 1rem;
+  color: var(--color-gray-600);
+}
+
+.public-asset-state-error {
+  background: #fff;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid var(--color-gray-200);
+  color: var(--color-gray-700);
+}
+
+.public-asset-card {
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--color-gray-200);
+  box-shadow: 0 4px 24px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.public-asset-hero {
+  padding: 1.35rem 1.25rem 1rem;
+  background: linear-gradient(180deg, rgba(240, 253, 244, 0.9) 0%, #fff 100%);
+  border-bottom: 1px solid var(--color-gray-100);
+}
+
+.public-asset-name {
+  margin: 0;
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--color-gray-900);
+  line-height: 1.25;
+}
+
+.public-asset-ids {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.public-asset-id-pill {
+  font-size: 0.8rem;
+  padding: 0.25rem 0.55rem;
+  border-radius: 6px;
+  background: var(--color-gray-100);
+  color: var(--color-gray-700);
+}
+
+.public-asset-id-pill strong {
+  color: var(--color-gray-500);
+  font-weight: 600;
+  margin-right: 0.25rem;
+}
+
+.public-asset-sections {
+  padding: 0.25rem 0 0;
+}
+
+.public-asset-section {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid var(--color-gray-100);
+}
+
+.public-asset-section:last-of-type {
+  border-bottom: none;
+}
+
+.public-asset-section h3 {
+  margin: 0 0 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-gray-500);
+}
+
+.public-asset-dl {
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.public-asset-dl > div {
+  display: grid;
+  grid-template-columns: 8.5rem 1fr;
+  gap: 0.5rem 1rem;
+  align-items: start;
+  font-size: 0.9rem;
+}
+
+.public-asset-dl dt {
+  margin: 0;
+  color: var(--color-gray-500);
+  font-weight: 500;
+}
+
+.public-asset-dl dd {
+  margin: 0;
+  color: var(--color-gray-900);
+}
+
+.public-asset-life-hint {
+  font-size: 0.82rem;
+  color: var(--color-gray-500);
+  font-weight: 400;
+}
+
+.public-asset-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.public-asset-notes {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--color-gray-100);
+  background: var(--color-gray-50, #f9fafb);
+}
+
+.public-asset-notes h3 {
+  margin: 0 0 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-gray-500);
+}
+
+.public-asset-notes p {
+  margin: 0;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: var(--color-gray-800);
+  white-space: pre-wrap;
+}
+
+.public-asset-footnote {
+  margin: 0;
+  padding: 0.85rem 1.25rem 1.15rem;
+  font-size: 0.72rem;
+  line-height: 1.45;
+  color: var(--color-gray-500);
+  border-top: 1px solid var(--color-gray-100);
+}
+
+@media (max-width: 520px) {
+  .public-asset-dl > div {
+    grid-template-columns: 1fr;
+  }
+
+  .public-asset-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 /* ── Scan QR page ── */

@@ -32,7 +32,9 @@ service cloud.firestore {
     }
 
     match /assets/{assetId} {
-      allow read: if request.auth != null &&
+      // Single-document reads (QR link /a/{id}) — no listing without auth + region.
+      allow get: if true;
+      allow list: if request.auth != null &&
         (getUserRegion() == 'all' || resource.data.region == getUserRegion());
       allow create: if request.auth != null && !isViewer() &&
         (getUserRegion() == 'all' || request.resource.data.region == getUserRegion());
