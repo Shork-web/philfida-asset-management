@@ -9,6 +9,7 @@ import {
   query,
   where,
   orderBy,
+  onSnapshot,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore'
@@ -200,46 +201,66 @@ export function getUniqueAssetIdsInDuplicateGroups(groups) {
   return ids
 }
 
+function mapAssetDocumentSnapshot(docSnap) {
+  const data = docSnap.data()
+  return {
+    id: docSnap.id,
+    ...data,
+    value: data.value ?? null,
+    serialNumber: data.serialNumber ?? null,
+    assignedTo: data.assignedTo ?? null,
+    purchaseDate: data.purchaseDate ?? null,
+    notes: data.notes ?? null,
+    issuedToHistory: normalizeIssuedToHistory(data.issuedToHistory),
+    region: data.region ?? null,
+    createdAt: fromTimestamp(data.createdAt),
+    updatedAt: fromTimestamp(data.updatedAt),
+  }
+}
+
+function buildAssetsQuery(region) {
+  const db = getDb()
+  const col = collection(db, ASSETS_COLLECTION)
+  const useRegion = region && region !== 'all'
+  const q = useRegion
+    ? query(col, where('region', '==', region))
+    : query(col, orderBy('createdAt', 'desc'))
+  return { q, useRegion }
+}
+
 /**
  * @param {string | null} [region] - User's region from profile. Use 'all' or null to fetch every asset.
  */
 export async function fetchAssets(region) {
-  const db = getDb()
-  const col = collection(db, ASSETS_COLLECTION)
-  const useRegion = region && region !== 'all'
-
-  // Use a simple single-field query when region-scoped to avoid composite index requirement.
-  // Sort is applied in JS after fetching.
-  const q = useRegion
-    ? query(col, where('region', '==', region))
-    : query(col, orderBy('createdAt', 'desc'))
-
+  const { q, useRegion } = buildAssetsQuery(region)
   const snapshot = await getDocs(q)
-  const rows = snapshot.docs.map((d) => {
-    const data = d.data()
-    return {
-      id: d.id,
-      ...data,
-      value: data.value ?? null,
-      serialNumber: data.serialNumber ?? null,
-      assignedTo: data.assignedTo ?? null,
-      purchaseDate: data.purchaseDate ?? null,
-      notes: data.notes ?? null,
-      issuedToHistory: normalizeIssuedToHistory(data.issuedToHistory),
-      region: data.region ?? null,
-      createdAt: fromTimestamp(data.createdAt),
-      updatedAt: fromTimestamp(data.updatedAt),
-    }
-  })
-
+  const rows = snapshot.docs.map((d) => mapAssetDocumentSnapshot(d))
   return useRegion ? sortByCreatedAtDesc(rows) : rows
 }
 
 /**
- * @param {string | null} [region] - Same as fetchAssets; stats are computed from region-filtered assets.
+ * Live updates when any client (same or other device) changes assets in Firestore.
+ * @param {string | null} [region]
+ * @param {{ onNext: (assets: object[]) => void, onError?: (err: Error) => void }} callbacks
+ * @returns {() => void} unsubscribe
  */
-export async function fetchStats(region) {
-  const assets = await fetchAssets(region)
+export function subscribeToAssets(region, callbacks) {
+  const { onNext, onError } = callbacks
+  const { q, useRegion } = buildAssetsQuery(region)
+  return onSnapshot(
+    q,
+    (snapshot) => {
+      const rows = snapshot.docs.map((d) => mapAssetDocumentSnapshot(d))
+      onNext(useRegion ? sortByCreatedAtDesc(rows) : rows)
+    },
+    (err) => {
+      onError?.(err)
+    },
+  )
+}
+
+/** Stats derived from the same asset list shape as fetchAssets / subscribeToAssets. */
+export function computeAssetStats(assets) {
   const total = assets.length
   const byStatus = {}
   const byType = {}
@@ -252,6 +273,26 @@ export async function fetchStats(region) {
   }
 
   return { total, byStatus, byType, totalValue }
+}
+
+/**
+ * @param {string | null} [region] - Same as fetchAssets; stats are computed from region-filtered assets.
+ */
+export async function fetchStats(region) {
+  const assets = await fetchAssets(region)
+  return computeAssetStats(assets)
+}
+
+/**
+ * Latest asset from Firestore by document id (e.g. after scanning a QR that encodes id).
+ * @param {string} id
+ */
+export async function fetchAssetById(id) {
+  if (!id) return null
+  const db = getDb()
+  const ref = doc(db, ASSETS_COLLECTION, id)
+  const snap = await getDoc(ref)
+  return toAssetData(snap)
 }
 
 export async function createAsset(payload) {

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAuth } from '../lib/useAuth'
-import { fetchAssets } from '../lib/api'
+import { useAssetsSubscription } from '../lib/useAssetsSubscription'
 import { UNSERVICEABLE_STATUSES, formatPHP } from '../lib/constants'
 import AssetTable from '../components/AssetTable'
 import AssetFormModal from '../components/AssetFormModal'
@@ -14,27 +14,15 @@ import ExportModal from '../components/ExportModal'
 export default function UnserviceableAssets() {
   const { userRegion, userRole } = useAuth() || {}
   const isViewer = userRole === 'viewer'
-  const [allAssets, setAllAssets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { toasts, push: toast } = useToasts()
+  const { assets: allAssets, loading, manualRefresh } = useAssetsSubscription(userRegion, toast)
   const [editingAsset, setEditingAsset] = useState(null)
   const [deletingAsset, setDeletingAsset] = useState(null)
   const [bulkDeletingAssets, setBulkDeletingAssets] = useState(null)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [showExport, setShowExport] = useState(false)
-  const { toasts, push: toast } = useToasts()
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      setAllAssets(await fetchAssets(userRegion ?? 'all'))
-    } catch {
-      toast('Could not load assets.', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [toast, userRegion])
-
-  useEffect(() => { load() }, [load])
+  const syncAfterMutation = useCallback(() => {}, [])
 
   const assets = useMemo(
     () => allAssets.filter((a) => UNSERVICEABLE_STATUSES.includes(a.status)),
@@ -83,7 +71,7 @@ export default function UnserviceableAssets() {
             >
               <IconDownload /> Export
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={load} disabled={loading}>
+            <button className="btn btn-ghost btn-sm" onClick={manualRefresh} disabled={loading}>
               <IconRefresh /> Refresh
             </button>
           </div>
@@ -107,13 +95,20 @@ export default function UnserviceableAssets() {
           userRegion={userRegion}
           existingAssets={allAssets}
           onClose={() => setEditingAsset(null)}
-          onSaved={load}
+          onSaved={syncAfterMutation}
           toast={toast}
         />
       )}
-      {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
+      {!isViewer && deletingAsset && (
+        <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={syncAfterMutation} toast={toast} />
+      )}
       {!isViewer && bulkDeletingAssets && (
-        <BulkDeleteConfirm assets={bulkDeletingAssets} onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }} onDeleted={() => { load(); setSelectedIds(new Set()) }} toast={toast} />
+        <BulkDeleteConfirm
+          assets={bulkDeletingAssets}
+          onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }}
+          onDeleted={() => { syncAfterMutation(); setSelectedIds(new Set()) }}
+          toast={toast}
+        />
       )}
       {showExport && (
         <ExportModal assets={allAssets} userRegion={userRegion} onClose={() => setShowExport(false)} />

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAuth } from '../lib/useAuth'
-import { fetchAssets, findAssetDuplicateGroups, getUniqueAssetIdsInDuplicateGroups } from '../lib/api'
+import { findAssetDuplicateGroups, getUniqueAssetIdsInDuplicateGroups } from '../lib/api'
+import { useAssetsSubscription } from '../lib/useAssetsSubscription'
 import { TYPE_LABELS, formatPHP, getAssetLifeInfo, ASSET_LIFE_YEARS } from '../lib/constants'
 import StatusBadge from '../components/StatusBadge'
 import AssetFormModal from '../components/AssetFormModal'
@@ -23,28 +24,14 @@ function formatLifeIndicator(info) {
 export default function Duplicates() {
   const { userRegion, userRole } = useAuth() || {}
   const isViewer = userRole === 'viewer'
-  const [assets, setAssets] = useState([])
-  const [loading, setLoading] = useState(true)
+  const { toasts, push: toast } = useToasts()
+  const { assets, loading, manualRefresh } = useAssetsSubscription(userRegion, toast)
   const [editingAsset, setEditingAsset] = useState(null)
   const [deletingAsset, setDeletingAsset] = useState(null)
   const [viewingAsset, setViewingAsset] = useState(null)
   const [qrAsset, setQrAsset] = useState(null)
-  const { toasts, push: toast } = useToasts()
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    try {
-      setAssets(await fetchAssets(userRegion ?? 'all'))
-    } catch {
-      toast('Could not load assets.', 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [toast, userRegion])
-
-  useEffect(() => {
-    load()
-  }, [load])
+  const syncAfterMutation = useCallback(() => {}, [])
 
   const duplicateGroups = useMemo(
     () => findAssetDuplicateGroups(assets).filter((g) => g.field === 'assetTag'),
@@ -87,7 +74,7 @@ export default function Duplicates() {
         <div className="panel-header">
           <h2>Duplicate entries</h2>
           <div className="panel-actions">
-            <button className="btn btn-ghost btn-sm" onClick={load} disabled={loading}>
+            <button className="btn btn-ghost btn-sm" onClick={manualRefresh} disabled={loading}>
               <IconRefresh /> Refresh
             </button>
           </div>
@@ -411,7 +398,6 @@ export default function Duplicates() {
           onClose={() => setDeletingAsset(null)}
           onDeleted={() => {
             const id = deletingAsset.id
-            load()
             setViewingAsset((v) => (v?.id === id ? null : v))
             setQrAsset((q) => (q?.id === id ? null : q))
             setEditingAsset((e) => (e?.id === id ? null : e))
@@ -426,7 +412,7 @@ export default function Duplicates() {
           userRegion={userRegion}
           existingAssets={assets}
           onClose={() => setEditingAsset(null)}
-          onSaved={load}
+          onSaved={syncAfterMutation}
           toast={toast}
         />
       )}

@@ -49,5 +49,13 @@ service cloud.firestore {
         (getUserRegion() == 'all' || resource.data.region == getUserRegion());
     }
 
+    // QR scan log: each user sees only their own entries (all signed-in devices share the same list).
+    match /scanHistory/{entryId} {
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow update: if false;
+    }
+
   }
 }

@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useAuth } from '../lib/useAuth'
-import { fetchAssets, fetchStats } from '../lib/api'
+import { computeAssetStats } from '../lib/api'
+import { useAssetsSubscription } from '../lib/useAssetsSubscription'
 import { formatPHP } from '../lib/constants'
 import AssetTable from '../components/AssetTable'
 import AssetFormModal from '../components/AssetFormModal'
@@ -15,10 +16,9 @@ import ImportModal from '../components/ImportModal'
 export default function Dashboard() {
   const { userRegion, userRole } = useAuth() || {}
   const isViewer = userRole === 'viewer'
-  const [assets, setAssets] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [configError, setConfigError] = useState(null)
-  const [stats, setStats] = useState(null)
+  const { toasts, push: toast } = useToasts()
+  const { assets, loading, configError, manualRefresh } = useAssetsSubscription(userRegion, toast)
+  const stats = useMemo(() => computeAssetStats(assets), [assets])
   const [showForm, setShowForm] = useState(false)
   const [editingAsset, setEditingAsset] = useState(null)
   const [deletingAsset, setDeletingAsset] = useState(null)
@@ -26,30 +26,8 @@ export default function Dashboard() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [showExport, setShowExport] = useState(false)
   const [showImport, setShowImport] = useState(false)
-  const { toasts, push: toast } = useToasts()
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setConfigError(null)
-    try {
-      const [assetData, statsData] = await Promise.all([
-        fetchAssets(userRegion ?? 'all'),
-        fetchStats(userRegion ?? 'all'),
-      ])
-      setAssets(assetData)
-      setStats(statsData)
-    } catch (err) {
-      const msg = err?.message?.includes('Firebase is not configured')
-        ? 'Firebase not configured. Add VITE_FIREBASE_* to .env (see .env.example)'
-        : err?.message || 'Could not load assets.'
-      setConfigError(msg)
-      toast(msg, 'error')
-    } finally {
-      setLoading(false)
-    }
-  }, [toast, userRegion])
-
-  useEffect(() => { load() }, [load])
+  const syncAfterMutation = useCallback(() => {}, [])
 
   const assigned = stats?.byStatus?.ASSIGNED ?? 0
   const spare = stats?.byStatus?.SPARE ?? 0
@@ -156,7 +134,7 @@ export default function Dashboard() {
             >
               <IconDownload /> Export
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={load} disabled={loading}>
+            <button className="btn btn-ghost btn-sm" onClick={manualRefresh} disabled={loading}>
               <IconRefresh /> Refresh
             </button>
           </div>
@@ -180,7 +158,7 @@ export default function Dashboard() {
           userRegion={userRegion}
           existingAssets={assets}
           onClose={() => setShowForm(false)}
-          onSaved={load}
+          onSaved={syncAfterMutation}
           toast={toast}
         />
       )}
@@ -190,16 +168,18 @@ export default function Dashboard() {
           userRegion={userRegion}
           existingAssets={assets}
           onClose={() => setEditingAsset(null)}
-          onSaved={load}
+          onSaved={syncAfterMutation}
           toast={toast}
         />
       )}
-      {!isViewer && deletingAsset && <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={load} toast={toast} />}
+      {!isViewer && deletingAsset && (
+        <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={syncAfterMutation} toast={toast} />
+      )}
       {!isViewer && bulkDeletingAssets && (
         <BulkDeleteConfirm
           assets={bulkDeletingAssets}
           onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }}
-          onDeleted={() => { load(); setSelectedIds(new Set()) }}
+          onDeleted={() => { syncAfterMutation(); setSelectedIds(new Set()) }}
           toast={toast}
         />
       )}
@@ -211,7 +191,7 @@ export default function Dashboard() {
           userRegion={userRegion}
           existingAssets={assets}
           onClose={() => setShowImport(false)}
-          onImported={load}
+          onImported={syncAfterMutation}
           toast={toast}
         />
       )}
