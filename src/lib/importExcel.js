@@ -78,7 +78,7 @@ export async function parseAssetsFromExcel(buffer) {
 
   const errors = []
   const headerNames = [
-    'ARTICLE', 'DESCRIPTION', 'OLD PROPERTY NUMBER', 'NEW PROPERTY NUMBER', 'YEAR OF ACQ.',
+    'ARTICLE', 'DESCRIPTION', 'SERIAL NUMBER', 'OLD PROPERTY NUMBER', 'NEW PROPERTY NUMBER', 'YEAR OF ACQ.',
     'TOTAL VALUE', 'ISSUED TO', 'LOCATION',
     'QUANTITY per PROPERTY CARD', 'QUANTITY per PHYSICAL COUNT', 'REMARKS',
   ]
@@ -134,6 +134,8 @@ export async function parseAssetsFromExcel(buffer) {
 
     const parsed = parseArticle(articleStr)
     const descParsed = parseDescription(descStr)
+    const serialFromCol = get('SERIAL NUMBER')
+    const serialNumber = (serialFromCol && serialFromCol.trim()) || descParsed.serialNumber || null
 
     const asset = {
       assetTag: assetTag || '',
@@ -142,7 +144,7 @@ export async function parseAssetsFromExcel(buffer) {
       type: parsed.type,
       subtype: parsed.subtype,
       status: 'SPARE',
-      serialNumber: descParsed.serialNumber || null,
+      serialNumber,
       issuedTo: get('ISSUED TO') || null,
       location: get('LOCATION') || null,
       yearOfAcquisition: parseYear(get('YEAR OF ACQ.')),

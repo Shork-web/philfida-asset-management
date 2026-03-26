@@ -202,7 +202,8 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
         <div className="modal-body">
           <p className="import-hint">
             Upload an Excel file in the export template format. After loading, <strong>review and edit</strong> rows below,
-            then click Import. Columns: ARTICLE → type/subtype, DESCRIPTION → name &amp; serial, OLD/NEW property numbers,
+            then click Import. Columns: ARTICLE → type/subtype, DESCRIPTION → name (optional S/N in text), SERIAL NUMBER,
+            OLD/NEW property numbers,
             year, value, issued to, location, quantities, remarks.
           </p>
 
