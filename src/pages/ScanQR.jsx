@@ -1,14 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import jsQR from 'jsqr'
 import { fetchAssetById } from '../lib/api'
 import { parseAssetQRPayload } from '../lib/assetQRPayload'
-import { useAuth } from '../lib/useAuth'
 import {
-  addScanHistoryEntry,
-  clearScanHistoryForUser,
-  subscribeToScanHistory,
-} from '../lib/scanHistoryApi'
-import { TYPE_LABELS, formatPHP, getAssetLifeInfo, ASSET_LIFE_YEARS } from '../lib/constants'
+  decodePhilFidaAssetFromImageData,
+  decodePhilFidaAssetFromVideoFrame,
+} from '../lib/qrDecode'
+import { TYPE_LABELS, formatPHP, getAssetLifeInfo } from '../lib/constants'
 import StatusBadge from '../components/StatusBadge'
 
 function checkSecureContext() {
@@ -21,13 +18,10 @@ function checkSecureContext() {
 const secureOk = checkSecureContext()
 
 export default function ScanQR() {
-  const { user } = useAuth()
-  const uid = user?.uid
-
   const [mode, setMode] = useState('idle')   // 'idle' | 'camera' | 'result'
   const [scanResult, setScanResult] = useState(null)
+  /** Session-only list (this browser tab); cleared on refresh or Clear all. */
   const [scanHistory, setScanHistory] = useState([])
-  const [historyClearing, setHistoryClearing] = useState(false)
   const [cameraError, setCameraError] = useState(null)
   const [uploadError, setUploadError] = useState(null)
   const [uploadLoading, setUploadLoading] = useState(false)
@@ -40,51 +34,49 @@ export default function ScanQR() {
   const rafRef = useRef(null)
   const fileInputRef = useRef(null)
   const activeRef = useRef(false)  // prevents stale RAF callbacks after stop
+  const frameCountRef = useRef(0)
+  const lastBarcodeMsRef = useRef(0)
+  const barcodeDetectorRef = useRef(null)
+
+  const [torchSupported, setTorchSupported] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
 
   // ── Stop camera completely ───────────────────────────────────────────
   const completeScan = useCallback(async (parsed) => {
     setScanResult(parsed)
     setResultSource('qr')
     setMode('result')
-    if (uid) {
+
+    let historySnapshot = parsed
+    if (parsed?.id) {
       try {
-        await addScanHistoryEntry(uid, {
-          oldPropertyNumber: parsed.assetTag ?? null,
-          newPropertyNumber: parsed.newPropertyNumber ?? null,
-          assetId: parsed.id ?? null,
-        })
-      } catch (err) {
-        console.error('Could not save scan to history (Firestore rules or index):', err?.message || err)
-      }
-    }
-    if (!parsed?.id) return
-    try {
-      const live = await fetchAssetById(parsed.id)
-      if (live) {
-        setScanResult(live)
-        setResultSource('live')
-      } else {
+        const live = await fetchAssetById(parsed.id)
+        if (live) {
+          setScanResult(live)
+          setResultSource('live')
+          historySnapshot = live
+        } else {
+          setResultSource('qrStale')
+        }
+      } catch {
         setResultSource('qrStale')
       }
-    } catch {
-      setResultSource('qrStale')
     }
-  }, [uid])
 
-  useEffect(() => {
-    if (!uid) {
-      setScanHistory([])
-      return undefined
-    }
-    return subscribeToScanHistory(
-      uid,
-      (entries) => setScanHistory(entries),
-      (err) => console.error('Scan history subscription:', err?.message || err),
-    )
-  }, [uid])
+    setScanHistory((prev) => [
+      {
+        oldPropertyNumber: historySnapshot.assetTag ?? null,
+        newPropertyNumber: historySnapshot.newPropertyNumber ?? null,
+        time: new Date(),
+      },
+      ...prev,
+    ])
+  }, [])
 
   const stopCamera = useCallback(() => {
     activeRef.current = false
+    setTorchOn(false)
+    setTorchSupported(false)
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null }
     if (streamRef.current) {
       streamRef.current.getTracks().forEach((t) => t.stop())
@@ -93,34 +85,72 @@ export default function ScanQR() {
     if (videoRef.current) videoRef.current.srcObject = null
   }, [])
 
-  // ── RAF scan loop — runs after video is playing ─────────────────────
+  const getBarcodeDetector = useCallback(() => {
+    const ref = barcodeDetectorRef
+    if (ref.current === false) return null
+    if (ref.current) return ref.current
+    if (typeof BarcodeDetector === 'undefined') {
+      ref.current = false
+      return null
+    }
+    try {
+      ref.current = new BarcodeDetector({ formats: ['qr_code'] })
+    } catch {
+      ref.current = false
+      return null
+    }
+    return ref.current
+  }, [])
+
+  // ── RAF scan loop — center crop (viewfinder) + full frame; periodic grayscale; native QR API when available ──
   const scanLoop = useCallback(() => {
     if (!activeRef.current) return
     const video = videoRef.current
     const canvas = canvasRef.current
-    if (!video || !canvas) { rafRef.current = requestAnimationFrame(scanLoop); return }
+    if (!video || !canvas) {
+      rafRef.current = requestAnimationFrame(scanLoop)
+      return
+    }
 
-    // Only scan when video has real pixels
     if (video.readyState === 4 && video.videoWidth > 0) {
-      canvas.width = video.videoWidth
-      canvas.height = video.videoHeight
-      const ctx = canvas.getContext('2d', { willReadFrequently: true })
-      ctx.drawImage(video, 0, 0)
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'attemptBoth',
-      })
-      if (code?.data) {
-        const asset = parseAssetQRPayload(code.data)
-        if (asset) {
-          stopCamera()
-          void completeScan(asset)
-          return
-        }
+      frameCountRef.current += 1
+      const tryGrayscale = frameCountRef.current % 4 === 0
+
+      const detector = getBarcodeDetector()
+      const now = performance.now()
+      if (detector && now - lastBarcodeMsRef.current > 280) {
+        lastBarcodeMsRef.current = now
+        void detector.detect(video).then((codes) => {
+          if (!activeRef.current) return
+          for (const c of codes) {
+            const raw = c.rawValue
+            if (raw == null || raw === '') continue
+            const asset = parseAssetQRPayload(typeof raw === 'string' ? raw : String(raw))
+            if (asset) {
+              activeRef.current = false
+              stopCamera()
+              void completeScan(asset)
+              return
+            }
+          }
+        }).catch(() => {})
+      }
+
+      const asset = decodePhilFidaAssetFromVideoFrame(
+        video,
+        canvas,
+        parseAssetQRPayload,
+        tryGrayscale,
+      )
+      if (asset) {
+        activeRef.current = false
+        stopCamera()
+        void completeScan(asset)
+        return
       }
     }
     rafRef.current = requestAnimationFrame(scanLoop)
-  }, [stopCamera, completeScan])
+  }, [stopCamera, completeScan, getBarcodeDetector])
 
   // ── Start the camera AFTER the video element is in the DOM ──────────
   // This useEffect runs whenever mode becomes 'camera', by which point
@@ -134,13 +164,27 @@ export default function ScanQR() {
         let stream
         try {
           stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            video: {
+              facingMode: { ideal: 'environment' },
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+            },
           })
         } catch {
-          stream = await navigator.mediaDevices.getUserMedia({ video: true })
+          try {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            })
+          } catch {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true })
+          }
         }
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
         streamRef.current = stream
+
+        const track = stream.getVideoTracks()[0]
+        const caps = track?.getCapabilities?.()
+        if (!cancelled && caps?.torch) setTorchSupported(true)
 
         const video = videoRef.current
         if (!video) { stream.getTracks().forEach((t) => t.stop()); return }
@@ -156,6 +200,8 @@ export default function ScanQR() {
         await video.play()
         if (cancelled) return
 
+        frameCountRef.current = 0
+        lastBarcodeMsRef.current = 0
         activeRef.current = true
         rafRef.current = requestAnimationFrame(scanLoop)
       } catch (err) {
@@ -197,16 +243,11 @@ export default function ScanQR() {
       const ctx = canvas.getContext('2d', { willReadFrequently: true })
       ctx.drawImage(bitmap, 0, 0)
       const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const code = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'attemptBoth',
-      })
-      if (!code?.data) {
-        setUploadError('No QR code found in this image. Make sure the full QR code is clearly visible.')
-        return
-      }
-      const asset = parseAssetQRPayload(code.data)
+      const asset = decodePhilFidaAssetFromImageData(imageData, parseAssetQRPayload)
       if (!asset) {
-        setUploadError('QR code found but it is not a PhilFIDA asset QR. Use a QR generated by this system.')
+        setUploadError(
+          'No PhilFIDA asset QR found. Use a clear photo, avoid glare, and ensure the full code is visible. You can also try the live camera scanner.',
+        )
         return
       }
       await completeScan(asset)
@@ -235,15 +276,15 @@ export default function ScanQR() {
     setMode('idle')
   }
 
-  const handleClearHistory = async () => {
-    if (!uid || scanHistory.length === 0) return
-    setHistoryClearing(true)
+  const toggleTorch = async () => {
+    const track = streamRef.current?.getVideoTracks?.()?.[0]
+    if (!track?.getCapabilities?.()?.torch) return
     try {
-      await clearScanHistoryForUser(uid)
-    } catch (err) {
-      console.error('Clear scan history:', err?.message || err)
-    } finally {
-      setHistoryClearing(false)
+      const next = !torchOn
+      await track.applyConstraints({ advanced: [{ torch: next }] })
+      setTorchOn(next)
+    } catch {
+      setTorchOn(false)
     }
   }
 
@@ -252,10 +293,7 @@ export default function ScanQR() {
       <header className="page-header">
         <div>
           <h1>Scan QR</h1>
-          <p>
-            Point your camera at an asset QR code or upload an image to view asset details.
-            Scan history is saved for your account and appears on every device where you are signed in.
-          </p>
+          <p>Point your camera at an asset QR code or upload an image to view asset details.</p>
         </div>
       </header>
 
@@ -348,11 +386,20 @@ export default function ScanQR() {
               <div className="scan-qr-viewfinder">
                 <div className="scan-qr-viewfinder-box" />
               </div>
-              <p className="scan-qr-camera-hint">Centre the QR code inside the frame</p>
+              <p className="scan-qr-camera-hint">
+                Align the code in the square — we scan that region first, then the full picture. Hold steady and avoid glare.
+              </p>
             </div>
-            <button type="button" className="btn btn-ghost" onClick={reset} style={{ marginTop: '0.75rem' }}>
-              Cancel
-            </button>
+            <div className="scan-qr-camera-actions">
+              {torchSupported && (
+                <button type="button" className="btn btn-primary scan-qr-torch-btn" onClick={() => void toggleTorch()}>
+                  {torchOn ? 'Turn light off' : 'Low light: turn light on'}
+                </button>
+              )}
+              <button type="button" className="btn btn-ghost" onClick={reset}>
+                Cancel
+              </button>
+            </div>
           </div>
         )}
 
@@ -483,21 +530,13 @@ export default function ScanQR() {
                 </svg>
               </span>
               <h2 className="scan-qr-history-title">Scan history</h2>
-              <span className="scan-qr-history-device-note" title="Same account on phone, tablet, or PC">
-                Synced for your account
-              </span>
               {scanHistory.length > 0 && (
                 <span className="scan-qr-history-count">{scanHistory.length}</span>
               )}
             </div>
             {scanHistory.length > 0 && (
-              <button
-                type="button"
-                className="scan-qr-history-clear"
-                onClick={() => void handleClearHistory()}
-                disabled={historyClearing || !uid}
-              >
-                {historyClearing ? 'Clearing…' : 'Clear all'}
+              <button type="button" className="scan-qr-history-clear" onClick={() => setScanHistory([])}>
+                Clear all
               </button>
             )}
           </div>
@@ -515,11 +554,11 @@ export default function ScanQR() {
             ) : (
               <ul className="scan-qr-history-list">
                 {scanHistory.map((entry, i) => (
-                  <li key={entry.id} className="scan-qr-history-item">
+                  <li key={i} className="scan-qr-history-item">
                     <div className="scan-qr-history-item-top">
                       <span className="scan-qr-history-index">{scanHistory.length - i}</span>
                       <span className="scan-qr-history-ts">
-                        {entry.time.toLocaleString(undefined, { dateStyle: 'short', timeStyle: 'medium' })}
+                        {entry.time.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </span>
                     </div>
                     <div className="scan-qr-history-fields">

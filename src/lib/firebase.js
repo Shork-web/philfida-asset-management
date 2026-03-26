@@ -39,5 +39,3 @@ export function getFirebaseAuth() {
 
 export const ASSETS_COLLECTION = 'assets'
 export const USERS_COLLECTION = 'users'
-/** Per-user QR scan log; synced across devices for the same account. */
-export const SCAN_HISTORY_COLLECTION = 'scanHistory'

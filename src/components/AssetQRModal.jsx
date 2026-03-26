@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import QRCode from 'qrcode'
 import { getAssetQRPayload } from '../lib/assetQRPayload'
 import { IconX } from './Icons'
 
-const QR_SIZE = 300
-// 'M' error correction + stripped payload keeps modules sparse and scannable
-const QR_OPTIONS = { width: QR_SIZE, margin: 2, errorCorrectionLevel: 'M' }
+// Larger canvas + low ECC: fewer, bigger modules — easier for phone cameras (payload is tiny JSON).
+const QR_SIZE = 360
+const QR_OPTIONS = { width: QR_SIZE, margin: 3, errorCorrectionLevel: 'L' }
 
 // Render QR + name + issued-to onto a canvas, return as data URL
 async function buildLabeledQR(asset, qrDataUrl) {
@@ -142,7 +142,7 @@ export default function AssetQRModal({ asset, onClose }) {
                 )}
               </div>
 
-              <p className="asset-qr-hint">Scan with the PhilFIDA system. Download includes name &amp; issued-to label.</p>
+              <p className="asset-qr-hint">Scan in this app to load the latest asset record. The PNG adds name and issued-to below the code for humans only.</p>
             </div>
           )}
         </div>
