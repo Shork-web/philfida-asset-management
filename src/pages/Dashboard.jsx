@@ -203,7 +203,9 @@ export default function Dashboard() {
           toast={toast}
         />
       )}
-      {showExport && <ExportModal assets={assets} onClose={() => setShowExport(false)} />}
+      {showExport && (
+        <ExportModal assets={assets} userRegion={userRegion} onClose={() => setShowExport(false)} />
+      )}
       {showImport && !isViewer && (
         <ImportModal
           userRegion={userRegion}

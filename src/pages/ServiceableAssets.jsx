@@ -125,7 +125,9 @@ export default function ServiceableAssets() {
       {!isViewer && bulkDeletingAssets && (
         <BulkDeleteConfirm assets={bulkDeletingAssets} onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }} onDeleted={() => { load(); setSelectedIds(new Set()) }} toast={toast} />
       )}
-      {showExport && <ExportModal assets={allAssets} onClose={() => setShowExport(false)} />}
+      {showExport && (
+        <ExportModal assets={allAssets} userRegion={userRegion} onClose={() => setShowExport(false)} />
+      )}
       <ToastContainer toasts={toasts} />
     </>
   )

@@ -31,14 +31,20 @@ function filterAssets(assets, scopeId, typeKey) {
   return assets.filter((a) => matchesScope(a, scopeId) && matchesType(a, typeKey))
 }
 
-function buildExportFilename(scopeId, typeKey) {
+function buildExportFilename(scopeId, typeKey, userRegion) {
   const scopePart =
     scopeId === 'all' ? 'All' : scopeId === 'serviceable' ? 'Serviceable' : 'Unserviceable'
   const typePart = typeKey === 'all' ? 'AllTypes' : typeKey
-  return `PhilFIDA7_${scopePart}_${typePart}`
+  const regionSegment =
+    userRegion === 'all'
+      ? 'MasterFile'
+      : userRegion
+        ? `Region${String(userRegion).replace(/[^a-zA-Z0-9]/g, '')}`
+        : 'Export'
+  return `PhilFIDA_${regionSegment}_${scopePart}_${typePart}`
 }
 
-export default function ExportModal({ assets, onClose }) {
+export default function ExportModal({ assets, onClose, userRegion }) {
   const [scopeId, setScopeId] = useState('all')
   const [typeKey, setTypeKey] = useState('all')
 
@@ -63,7 +69,7 @@ export default function ExportModal({ assets, onClose }) {
 
   const handleExport = async () => {
     if (filtered.length === 0) return
-    await exportAssetsToExcel(filtered, buildExportFilename(scopeId, typeKey))
+    await exportAssetsToExcel(filtered, buildExportFilename(scopeId, typeKey, userRegion))
     onClose()
   }
 
