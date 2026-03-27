@@ -387,6 +387,32 @@ export async function updateAsset(id, payload) {
   return toAssetData(snap)
 }
 
+/**
+ * Replace `issuedToHistory` wholesale (e.g. super admin removes individual entries).
+ * Does not change `issuedTo` / `issuedAt`; only the history array.
+ * @param {string} id
+ * @param {unknown[]} entries - normalized and capped to ISSUED_TO_HISTORY_MAX
+ */
+export async function replaceIssuedToHistory(id, entries) {
+  const db = getDb()
+  const ref = doc(db, ASSETS_COLLECTION, id)
+  const snap = await getDoc(ref)
+  if (!snap.exists()) {
+    throw new Error('Asset not found')
+  }
+  const normalized = normalizeIssuedToHistory(entries).slice(0, ISSUED_TO_HISTORY_MAX)
+  const forStore = normalized.map((e) => ({
+    name: e.name,
+    changedAt: e.changedAt,
+    issuedAt: e.issuedAt ?? null,
+  }))
+  await updateDoc(ref, {
+    issuedToHistory: forStore,
+    updatedAt: serverTimestamp(),
+  })
+  return toAssetData(await getDoc(ref))
+}
+
 export async function deleteAsset(id) {
   const db = getDb()
   const ref = doc(db, ASSETS_COLLECTION, id)

@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { format, isValid, parse, parseISO } from 'date-fns'
-import { createAsset, updateAsset, getAssetDuplicateMessages } from '../lib/api'
+import { createAsset, updateAsset, getAssetDuplicateMessages, replaceIssuedToHistory } from '../lib/api'
 import { STATUS_OPTIONS, STATUS_LABELS, TYPE_OPTIONS, TYPE_LABELS, SUBTYPE_OPTIONS, EMPTY_FORM } from '../lib/constants'
-import { IconX } from './Icons'
+import { IconX, IconTrash } from './Icons'
 
 function formatIssuedHistoryDate(iso) {
   if (!iso) return ''
@@ -37,6 +37,7 @@ function FormSection({ title, children, columns = 2 }) {
 
 export default function AssetFormModal({ asset, userRegion, existingAssets = [], onClose, onSaved, toast }) {
   const isEdit = Boolean(asset)
+  const isSuperAdmin = userRegion === 'all'
   const [form, setForm] = useState(
     asset
       ? {
@@ -60,8 +61,34 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
       : { ...EMPTY_FORM },
   )
   const [saving, setSaving] = useState(false)
+  const [localIssuedHistory, setLocalIssuedHistory] = useState([])
+  const [removingHistoryIdx, setRemovingHistoryIdx] = useState(null)
+
+  useEffect(() => {
+    if (isEdit && asset?.id) {
+      setLocalIssuedHistory([...(asset.issuedToHistory ?? [])])
+    } else {
+      setLocalIssuedHistory([])
+    }
+  }, [isEdit, asset?.id]) // eslint-disable-line react-hooks/exhaustive-deps -- sync on id only; parent editingAsset can stay stale after history edits
 
   const subtypes = SUBTYPE_OPTIONS[form.type] || []
+
+  const removeHistoryEntry = async (index) => {
+    if (!isSuperAdmin || !asset?.id || removingHistoryIdx != null) return
+    const next = localIssuedHistory.filter((_, i) => i !== index)
+    setRemovingHistoryIdx(index)
+    try {
+      const updated = await replaceIssuedToHistory(asset.id, next)
+      setLocalIssuedHistory([...(updated.issuedToHistory ?? [])])
+      toast('History entry removed', 'success')
+      onSaved?.()
+    } catch (err) {
+      toast(err?.message || 'Could not remove history entry', 'error')
+    } finally {
+      setRemovingHistoryIdx(null)
+    }
+  }
 
   const onChange = (e) => {
     const { name, value } = e.target
@@ -259,17 +286,36 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
                   is listed here with their <strong>Date issued</strong> (if set) and when they were reassigned (newest first).
                 </p>
               )}
-              {isEdit && (!asset.issuedToHistory || asset.issuedToHistory.length === 0) && (
+              {isEdit && localIssuedHistory.length === 0 && (
                 <p className="af-history-empty">
                   No previous assignees yet. When you change <strong>Issued to</strong> from a non-empty name and save, the
                   prior assignee appears here with dates.
                 </p>
               )}
-              {isEdit && asset.issuedToHistory && asset.issuedToHistory.length > 0 && (
+              {isEdit && localIssuedHistory.length > 0 && (
                 <ul className="af-issued-history-list">
-                  {asset.issuedToHistory.map((entry, idx) => (
+                  {localIssuedHistory.map((entry, idx) => (
                     <li key={`${entry.name}-${entry.changedAt}-${idx}`} className="af-issued-history-item">
-                      <span className="af-issued-history-name">{entry.name}</span>
+                      <div className="af-issued-history-head">
+                        <span className="af-issued-history-name">{entry.name}</span>
+                        {isSuperAdmin && (
+                          <button
+                            type="button"
+                            className="btn btn-ghost btn-sm af-history-remove"
+                            disabled={removingHistoryIdx != null}
+                            onClick={() => void removeHistoryEntry(idx)}
+                            aria-label={`Remove ${entry.name} from assignment history`}
+                          >
+                            {removingHistoryIdx === idx ? (
+                              '…'
+                            ) : (
+                              <>
+                                <IconTrash /> Remove
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
                       <div className="af-issued-history-dates">
                         <div className="af-issued-history-row">
                           <span className="af-issued-history-label">Date issued to staff</span>

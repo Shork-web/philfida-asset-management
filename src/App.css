@@ -956,10 +956,33 @@ tbody tr:hover {
   border-left: 3px solid var(--color-primary);
 }
 
+.af-issued-history-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
 .af-issued-history-name {
   font-weight: 700;
   font-size: 0.88rem;
   color: var(--color-gray-900);
+}
+
+.af-history-remove {
+  flex-shrink: 0;
+  padding: 0.2rem 0.5rem !important;
+  font-size: 0.72rem !important;
+  color: var(--color-danger, #b91c1c) !important;
+}
+
+.af-history-remove:hover:not(:disabled) {
+  background: #fef2f2 !important;
+}
+
+.af-history-remove:disabled {
+  opacity: 0.6;
 }
 
 .af-issued-history-dates {
