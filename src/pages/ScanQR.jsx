@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocation, Link } from 'react-router-dom'
 import { fetchAssetById } from '../lib/api'
 import { parseAssetQRPayload } from '../lib/assetQRPayload'
 import {
@@ -18,6 +19,9 @@ function checkSecureContext() {
 const secureOk = checkSecureContext()
 
 export default function ScanQR() {
+  const { pathname } = useLocation()
+  const isPublicScanner = pathname === '/qr'
+
   const [mode, setMode] = useState('idle')   // 'idle' | 'camera' | 'result'
   const [scanResult, setScanResult] = useState(null)
   /** Session-only list (this browser tab); cleared on refresh or Clear all. */
@@ -293,7 +297,16 @@ export default function ScanQR() {
       <header className="page-header">
         <div>
           <h1>Scan QR</h1>
-          <p>Point your camera at an asset QR code or upload an image to view asset details.</p>
+          {isPublicScanner ? (
+            <p>
+              No sign-in required. Point your camera or upload a photo of a PhilFIDA asset QR (link or code).
+              {' '}
+              <Link to="/login">Staff sign in</Link>
+              {' '}for the full dashboard and the in-app scanner under the sidebar menu.
+            </p>
+          ) : (
+            <p>Point your camera at an asset QR code or upload an image to view asset details.</p>
+          )}
         </div>
       </header>
 

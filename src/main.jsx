@@ -23,6 +23,8 @@ createRoot(document.getElementById('root')).render(
       <AuthProvider>
         <Routes>
           <Route path="/a/:assetId" element={<PublicAssetView />} />
+          {/* Same scanner as /scan but no login — uses public Firestore get on assets/{id} */}
+          <Route path="/qr" element={<ScanQR />} />
           <Route
             path="/login"
             element={

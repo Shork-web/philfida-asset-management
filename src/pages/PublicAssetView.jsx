@@ -31,8 +31,14 @@ export default function PublicAssetView() {
             setAsset(data)
           }
         })
-        .catch(() => {
-          if (!cancelled) setError('failed')
+        .catch((err) => {
+          if (cancelled) return
+          const code = err?.code
+          if (code === 'permission-denied' || code === 'missing-or-insufficient-permissions') {
+            setError('permission')
+          } else {
+            setError('failed')
+          }
         })
         .finally(() => {
           if (!cancelled) setLoading(false)
@@ -51,9 +57,14 @@ export default function PublicAssetView() {
             <p className="public-asset-brand-sub">Asset record (read-only)</p>
           </div>
         </div>
-        <Link to="/login" className="public-asset-signin-link">
-          Staff sign in
-        </Link>
+        <div className="public-asset-header-actions">
+          <Link to="/qr" className="public-asset-header-secondary">
+            Scan a QR
+          </Link>
+          <Link to="/login" className="public-asset-signin-link">
+            Staff sign in
+          </Link>
+        </div>
       </header>
 
       <main className="public-asset-main">
@@ -73,6 +84,21 @@ export default function PublicAssetView() {
         {!missingId && !loading && error === 'notfound' && (
           <div className="public-asset-state public-asset-state-error">
             <p>No asset was found for this link. It may have been removed or the link may be incorrect.</p>
+          </div>
+        )}
+
+        {!missingId && !loading && error === 'permission' && (
+          <div className="public-asset-state public-asset-state-error">
+            <p>
+              This page could not read the asset while signed out. Your Firebase project must allow
+              unauthenticated <strong>single-document</strong> reads on <code className="public-asset-code">assets</code>
+              (rule: <code className="public-asset-code">allow get: if true</code> on <code className="public-asset-code">{'assets/{assetId}'}</code>),
+              then run <code className="public-asset-code">firebase deploy --only firestore:rules</code>.
+            </p>
+            <p className="public-asset-retry-hint">
+              If you are signed in elsewhere in this browser, try <Link to="/login">opening the full app</Link> — or use{' '}
+              <Link to="/qr">Scan a QR</Link> without an account after rules are deployed.
+            </p>
           </div>
         )}
 
