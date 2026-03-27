@@ -255,14 +255,14 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
               <p className="af-section-title">Issued to history</p>
               {!isEdit && (
                 <p className="af-history-empty">
-                  After this asset is saved, each time you change <strong>Issued to</strong> and save, the previous name is
-                  recorded here (newest first).
+                  After this asset is saved, each time you change <strong>Issued to</strong> and save, the previous assignee
+                  is listed here with their <strong>Date issued</strong> (if set) and when they were reassigned (newest first).
                 </p>
               )}
               {isEdit && (!asset.issuedToHistory || asset.issuedToHistory.length === 0) && (
                 <p className="af-history-empty">
                   No previous assignees yet. When you change <strong>Issued to</strong> from a non-empty name and save, the
-                  prior name will appear here.
+                  prior assignee appears here with dates.
                 </p>
               )}
               {isEdit && asset.issuedToHistory && asset.issuedToHistory.length > 0 && (
@@ -270,9 +270,20 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
                   {asset.issuedToHistory.map((entry, idx) => (
                     <li key={`${entry.name}-${entry.changedAt}-${idx}`} className="af-issued-history-item">
                       <span className="af-issued-history-name">{entry.name}</span>
-                      <span className="af-issued-history-meta">
-                        {entry.changedAt ? formatIssuedHistoryDate(entry.changedAt) : '—'}
-                      </span>
+                      <div className="af-issued-history-dates">
+                        <div className="af-issued-history-row">
+                          <span className="af-issued-history-label">Date issued to staff</span>
+                          <span className="af-issued-history-value">
+                            {entry.issuedAt ? formatAssignedDate(entry.issuedAt) : '—'}
+                          </span>
+                        </div>
+                        <div className="af-issued-history-row">
+                          <span className="af-issued-history-label">Reassigned (next staff)</span>
+                          <span className="af-issued-history-value">
+                            {entry.changedAt ? formatIssuedHistoryDate(entry.changedAt) : '—'}
+                          </span>
+                        </div>
+                      </div>
                     </li>
                   ))}
                 </ul>

@@ -946,11 +946,10 @@ tbody tr:hover {
 
 .af-issued-history-item {
   display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 0.35rem 0.75rem;
-  padding: 0.5rem 0.65rem;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.45rem;
+  padding: 0.55rem 0.7rem;
   background: #f8fafc;
   border: 1px solid var(--color-gray-200);
   border-radius: var(--radius);
@@ -961,6 +960,34 @@ tbody tr:hover {
   font-weight: 700;
   font-size: 0.88rem;
   color: var(--color-gray-900);
+}
+
+.af-issued-history-dates {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding-top: 0.2rem;
+  border-top: 1px dashed var(--color-gray-200);
+}
+
+.af-issued-history-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.75rem;
+  font-size: 0.78rem;
+}
+
+.af-issued-history-label {
+  color: var(--color-gray-500);
+  font-weight: 600;
+}
+
+.af-issued-history-value {
+  color: var(--color-gray-800);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .af-issued-history-meta {

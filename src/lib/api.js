@@ -23,24 +23,6 @@ function sortByCreatedAtDesc(docs) {
 }
 import { getDb, ASSETS_COLLECTION } from './firebase'
 
-/** @param {unknown} raw */
-export function normalizeIssuedToHistory(raw) {
-  if (!Array.isArray(raw)) return []
-  const out = []
-  for (const e of raw) {
-    if (!e || typeof e !== 'object') continue
-    const name = typeof e.name === 'string' ? e.name.trim() : ''
-    if (!name) continue
-    let changedAt = ''
-    const ca = e.changedAt
-    if (ca instanceof Timestamp) changedAt = ca.toDate().toISOString()
-    else if (typeof ca === 'string') changedAt = ca
-    else if (ca && typeof ca.toDate === 'function') changedAt = ca.toDate().toISOString()
-    out.push({ name, changedAt })
-  }
-  return out
-}
-
 const ISSUED_TO_HISTORY_MAX = 50
 
 /** @param {unknown} raw */
@@ -65,6 +47,27 @@ function normalizeIssuedAt(raw) {
     return `${y}-${mo}-${da}`
   }
   return null
+}
+
+/**
+ * @param {unknown} raw
+ * @returns {{ name: string, changedAt: string, issuedAt: string|null }[]}
+ */
+export function normalizeIssuedToHistory(raw) {
+  if (!Array.isArray(raw)) return []
+  const out = []
+  for (const e of raw) {
+    if (!e || typeof e !== 'object') continue
+    const name = typeof e.name === 'string' ? e.name.trim() : ''
+    if (!name) continue
+    let changedAt = ''
+    const ca = e.changedAt
+    if (ca instanceof Timestamp) changedAt = ca.toDate().toISOString()
+    else if (typeof ca === 'string') changedAt = ca
+    else if (ca && typeof ca.toDate === 'function') changedAt = ca.toDate().toISOString()
+    out.push({ name, changedAt, issuedAt: normalizeIssuedAt(e.issuedAt) })
+  }
+  return out
 }
 
 function toAssetData(docSnap) {
@@ -365,7 +368,11 @@ export async function updateAsset(id, payload) {
   let history = normalizeIssuedToHistory(prev.issuedToHistory)
   if (prevIssued !== nextIssued && prevIssued !== '') {
     history = [
-      { name: prevIssued, changedAt: new Date().toISOString() },
+      {
+        name: prevIssued,
+        issuedAt: normalizeIssuedAt(prev.issuedAt),
+        changedAt: new Date().toISOString(),
+      },
       ...history,
     ].slice(0, ISSUED_TO_HISTORY_MAX)
   }
