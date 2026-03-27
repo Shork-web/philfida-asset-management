@@ -1084,18 +1084,83 @@ tbody tr:hover {
   margin-bottom: 1rem;
 }
 
-.import-upload-card {
+.import-upload-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   margin-bottom: 1.25rem;
+}
+
+.import-upload-card {
+  position: relative;
   padding: 1rem 1.25rem;
-  border: 2px dashed var(--color-gray-300);
+  border: 1px solid var(--color-gray-200);
   border-radius: var(--radius-lg);
   background: linear-gradient(180deg, #fafdfb 0%, #f4f9f5 100%);
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
 .import-upload-card:hover {
-  border-color: rgba(22, 101, 52, 0.45);
-  box-shadow: 0 2px 12px rgba(22, 101, 52, 0.08);
+  border-color: rgba(22, 101, 52, 0.35);
+  box-shadow: 0 2px 12px rgba(22, 101, 52, 0.06);
+}
+
+.import-drop-zone {
+  position: relative;
+  min-height: 7.5rem;
+  padding: 1.25rem 1rem;
+  border: 2px dashed var(--color-gray-300);
+  border-radius: var(--radius-lg);
+  background: var(--color-gray-50, #f9fafb);
+  transition: border-color 0.2s, background 0.2s, box-shadow 0.2s;
+}
+
+.import-drop-zone:hover {
+  border-color: rgba(22, 101, 52, 0.4);
+  background: #f0fdf4;
+}
+
+.import-drop-zone--active {
+  border-color: var(--color-primary, #166534);
+  border-style: solid;
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+  box-shadow: 0 0 0 3px rgba(22, 101, 52, 0.18), 0 6px 20px rgba(22, 101, 52, 0.1);
+}
+
+.import-drop-zone-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  text-align: center;
+  pointer-events: none;
+  user-select: none;
+}
+
+.import-drop-zone-svg {
+  color: var(--color-gray-400);
+  margin-bottom: 0.15rem;
+}
+
+.import-drop-zone--active .import-drop-zone-svg {
+  color: var(--color-primary, #166534);
+}
+
+.import-drop-zone-title {
+  font-weight: 700;
+  font-size: 0.95rem;
+  color: var(--color-gray-800);
+}
+
+.import-drop-zone--active .import-drop-zone-title {
+  color: var(--color-primary, #14532d);
+}
+
+.import-drop-zone-meta {
+  font-size: 0.78rem;
+  color: var(--color-gray-500);
+  font-weight: 500;
 }
 
 .import-upload-btn {
@@ -2607,9 +2672,106 @@ tbody tr:hover {
 }
 
 .scan-qr-result-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
   margin-top: 0.5rem;
   padding-top: 1.25rem;
   border-top: 1px solid var(--color-gray-200);
+}
+
+.scan-qr-print-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.scan-qr-print-only {
+  display: none;
+}
+
+@media print {
+  @page {
+    margin: 12mm;
+    size: auto;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+  }
+
+  .sidebar,
+  .top-bar,
+  .scan-qr-history-panel,
+  .scan-qr-no-print {
+    display: none !important;
+  }
+
+  .layout,
+  .main-wrapper,
+  .main-content {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .scan-qr-section {
+    display: block !important;
+    grid-template-columns: 1fr !important;
+    gap: 0 !important;
+  }
+
+  .scan-qr-main {
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .scan-qr-result {
+    margin: 0 !important;
+  }
+
+  .scan-qr-result-card {
+    box-shadow: none !important;
+    border: 1px solid #bbb !important;
+    padding: 1rem 1.25rem !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .scan-qr-result-hero {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .scan-qr-result-section {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .scan-qr-print-only {
+    display: block !important;
+  }
+
+  .scan-qr-print-dochead {
+    font-size: 1.1rem;
+    font-weight: 700;
+    margin: 0 0 0.2rem;
+    color: #111827;
+    letter-spacing: -0.02em;
+  }
+
+  .scan-qr-print-meta {
+    font-size: 0.72rem;
+    color: #4b5563;
+    margin: 0 0 1rem;
+    padding-bottom: 0.65rem;
+    border-bottom: 1px solid #d1d5db;
+  }
 }
 
 .detail-grid {

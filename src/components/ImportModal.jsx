@@ -109,11 +109,43 @@ function normalizeDraftFromParse(assets) {
   }))
 }
 
+function isExcelFileName(name) {
+  const n = String(name || '').toLowerCase()
+  return n.endsWith('.xlsx') || n.endsWith('.xls')
+}
+
 export default function ImportModal({ userRegion, existingAssets = [], onClose, onImported, toast }) {
   const [draftRows, setDraftRows] = useState(null)
   const [error, setError] = useState(null)
   const [importing, setImporting] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef(null)
+  const dragDepthRef = useRef(0)
+
+  const processImportFile = useCallback(async (file) => {
+    if (!file) return
+    if (!isExcelFileName(file.name)) {
+      setError('Please use an Excel file (.xlsx or .xls) in the export template format.')
+      return
+    }
+    setError(null)
+    setDraftRows(null)
+    try {
+      const buffer = await file.arrayBuffer()
+      const { assets, errors } = await parseAssetsFromExcel(buffer)
+      if (errors?.length) {
+        setError(errors.length > 1 ? errors.join(' ') : errors[0])
+        return
+      }
+      if (!assets?.length) {
+        setError('No valid rows found. Check that the file uses the expected column names.')
+        return
+      }
+      setDraftRows(normalizeDraftFromParse(assets))
+    } catch (err) {
+      setError(err.message || 'Could not read file. Use the export template format.')
+    }
+  }, [])
 
   const updateRow = useCallback((index, patch) => {
     setDraftRows((prev) => {
@@ -171,25 +203,49 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
-    setError(null)
-    setDraftRows(null)
-    try {
-      const buffer = await file.arrayBuffer()
-      const { assets, errors } = await parseAssetsFromExcel(buffer)
-      if (errors?.length) {
-        setError(errors.length > 1 ? errors.join(' ') : errors[0])
-        return
-      }
-      if (!assets?.length) {
-        setError('No valid rows found. Check that the file uses the expected column names.')
-        return
-      }
-      setDraftRows(normalizeDraftFromParse(assets))
-    } catch (err) {
-      setError(err.message || 'Could not read file. Use the export template format.')
-    }
+    await processImportFile(file)
     e.target.value = ''
   }
+
+  const onDragEnter = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragDepthRef.current += 1
+    setDragActive(true)
+  }, [])
+
+  const onDragLeave = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dragDepthRef.current -= 1
+    if (dragDepthRef.current <= 0) {
+      dragDepthRef.current = 0
+      setDragActive(false)
+    }
+  }, [])
+
+  const onDragOver = useCallback((e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    try {
+      e.dataTransfer.dropEffect = 'copy'
+    } catch {
+      /* ignore */
+    }
+  }, [])
+
+  const onDrop = useCallback(
+    (e) => {
+      e.preventDefault()
+      e.stopPropagation()
+      dragDepthRef.current = 0
+      setDragActive(false)
+      const file = e.dataTransfer?.files?.[0]
+      if (!file) return
+      void processImportFile(file)
+    },
+    [processImportFile],
+  )
 
   const handleImport = async () => {
     if (!draftRows?.length) return
@@ -269,32 +325,56 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
         </div>
         <div className="modal-body">
           <p className="import-hint">
-            Upload an Excel file in the export template format. After loading, <strong>review and edit</strong> rows below,
+            Choose a file with the button, or drop an Excel file in the <strong>dedicated area below</strong>. Use the export template format. After loading, <strong>review and edit</strong> rows below,
             then click Import. <strong>NEW PROPERTY NUMBER</strong> is required on every row (imports are blocked if it is missing).
             Columns: ARTICLE → type/subtype, DESCRIPTION → name (optional S/N in text), SERIAL NUMBER,
             OLD/NEW property numbers,
             year, value, issued to, location, quantities, remarks.
           </p>
 
-          <div className="import-upload-card">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".xlsx,.xls"
-              onChange={handleFileChange}
-              className="import-file-input"
-            />
-            <button
-              type="button"
-              className="btn btn-ghost import-upload-btn"
-              onClick={() => fileInputRef.current?.click()}
+          <div className="import-upload-stack">
+            <div className="import-upload-card">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".xlsx,.xls,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel"
+                onChange={handleFileChange}
+                className="import-file-input"
+              />
+              <button
+                type="button"
+                className="btn btn-ghost import-upload-btn"
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <IconUpload />
+                <span>
+                  <span className="import-upload-btn-title">Choose Excel file</span>
+                  <span className="import-upload-btn-meta">.xlsx or .xls · same columns as export</span>
+                </span>
+              </button>
+            </div>
+
+            <div
+              className={`import-drop-zone${dragActive ? ' import-drop-zone--active' : ''}`}
+              role="region"
+              aria-label="Drop zone for Excel file import"
+              onDragEnter={onDragEnter}
+              onDragLeave={onDragLeave}
+              onDragOver={onDragOver}
+              onDrop={onDrop}
             >
-              <IconUpload />
-              <span>
-                <span className="import-upload-btn-title">Choose Excel file</span>
-                <span className="import-upload-btn-meta">.xlsx or .xls · same columns as export</span>
-              </span>
-            </button>
+              <div className="import-drop-zone-inner">
+                <svg className="import-drop-zone-svg" width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
+                  <path d="M12 15V3" />
+                  <path d="m7 8 5-5 5 5" />
+                  <rect x="3" y="15" width="18" height="6" rx="1.5" />
+                </svg>
+                <span className="import-drop-zone-title">
+                  {dragActive ? 'Release to load file' : 'Drop Excel file here'}
+                </span>
+                <span className="import-drop-zone-meta">.xlsx or .xls only</span>
+              </div>
+            </div>
           </div>
 
           {error && <div className="import-error">{error}</div>}

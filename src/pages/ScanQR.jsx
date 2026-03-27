@@ -44,9 +44,11 @@ export default function ScanQR() {
 
   const [torchSupported, setTorchSupported] = useState(false)
   const [torchOn, setTorchOn] = useState(false)
+  const [printTimestamp, setPrintTimestamp] = useState(null)
 
   // ── Stop camera completely ───────────────────────────────────────────
   const completeScan = useCallback(async (parsed) => {
+    setPrintTimestamp(null)
     setScanResult(parsed)
     setResultSource('qr')
     setMode('result')
@@ -268,6 +270,7 @@ export default function ScanQR() {
     setUploadError(null)
     setScanResult(null)
     setResultSource(null)
+    setPrintTimestamp(null)
     setMode('camera')   // renders <video>; useEffect above fires the stream
   }
 
@@ -275,6 +278,7 @@ export default function ScanQR() {
     stopCamera()
     setScanResult(null)
     setResultSource(null)
+    setPrintTimestamp(null)
     setCameraError(null)
     setUploadError(null)
     setMode('idle')
@@ -292,9 +296,17 @@ export default function ScanQR() {
     }
   }
 
+  const handlePrintResult = useCallback(() => {
+    const ts = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    setPrintTimestamp(ts)
+    window.setTimeout(() => {
+      window.print()
+    }, 150)
+  }, [])
+
   return (
     <>
-      <header className="page-header">
+      <header className={`page-header${mode === 'result' && scanResult ? ' scan-qr-no-print' : ''}`}>
         <div>
           <h1>Scan QR</h1>
           {isPublicScanner ? (
@@ -419,7 +431,12 @@ export default function ScanQR() {
         {/* ── Result ── */}
         {mode === 'result' && scanResult && (
           <div className="scan-qr-result">
-            <div className="scan-qr-result-card">
+            <div className="scan-qr-result-card scan-qr-print-area">
+              <div className="scan-qr-print-only scan-qr-print-dochead">PhilFIDA — QR scan result</div>
+              {printTimestamp && (
+                <p className="scan-qr-print-only scan-qr-print-meta">Printed {printTimestamp}</p>
+              )}
+
               <div className="scan-qr-result-header">
                 <span className="scan-qr-result-icon">
                   <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -519,7 +536,15 @@ export default function ScanQR() {
                 </div>
               )}
 
-              <div className="scan-qr-result-actions">
+              <div className="scan-qr-result-actions scan-qr-no-print">
+                <button type="button" className="btn btn-ghost scan-qr-print-action" onClick={handlePrintResult}>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                    <path d="M6 9V2h12v7" />
+                    <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                    <rect x="6" y="14" width="12" height="8" rx="1" />
+                  </svg>
+                  Print
+                </button>
                 <button type="button" className="btn btn-primary" onClick={openCamera}>
                   Scan another with camera
                 </button>
