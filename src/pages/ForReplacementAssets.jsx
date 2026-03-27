@@ -1,0 +1,126 @@
+import { useCallback, useMemo, useState } from 'react'
+import { useAuth } from '../lib/useAuth'
+import { useAssetsSubscription } from '../lib/useAssetsSubscription'
+import { ASSET_LIFE_YEARS, formatPHP, getAssetLifeInfo } from '../lib/constants'
+import AssetTable from '../components/AssetTable'
+import AssetFormModal from '../components/AssetFormModal'
+import DeleteConfirm from '../components/DeleteConfirm'
+import BulkDeleteConfirm from '../components/BulkDeleteConfirm'
+import { useToasts } from '../lib/useToasts'
+import { ToastContainer } from '../components/Toasts'
+import { IconRefresh, IconDownload, IconTrash } from '../components/Icons'
+import ExportModal from '../components/ExportModal'
+
+export default function ForReplacementAssets() {
+  const { userRegion, userRole } = useAuth() || {}
+  const isViewer = userRole === 'viewer'
+  const { toasts, push: toast } = useToasts()
+  const { assets: allAssets, loading, manualRefresh } = useAssetsSubscription(userRegion, toast)
+  const [editingAsset, setEditingAsset] = useState(null)
+  const [deletingAsset, setDeletingAsset] = useState(null)
+  const [bulkDeletingAssets, setBulkDeletingAssets] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [showExport, setShowExport] = useState(false)
+
+  const syncAfterMutation = useCallback(() => {}, [])
+
+  const assets = useMemo(
+    () => allAssets.filter((a) => getAssetLifeInfo(a.yearOfAcquisition)?.forReplacement === true),
+    [allAssets],
+  )
+
+  const totalValue = useMemo(() => assets.reduce((s, a) => s + (a.value ?? 0), 0), [assets])
+
+  return (
+    <>
+      <header className="page-header">
+        <div>
+          <h1>For Replacement</h1>
+          <p>
+            Assets at or past the {ASSET_LIFE_YEARS}-year service life (by year of acquisition). Plan procurement or disposal as needed.
+          </p>
+        </div>
+      </header>
+
+      <section className="stats">
+        <article className="stat-card warning">
+          <p className="stat-label">For replacement</p>
+          <strong className="stat-value">{assets.length}</strong>
+        </article>
+        <article className="stat-card">
+          <p className="stat-label">Total Value</p>
+          <strong className="stat-value" style={{ fontSize: '1.15rem' }}>{formatPHP(totalValue)}</strong>
+        </article>
+      </section>
+
+      <section className="panel">
+        <div className="panel-header">
+          <h2>For Replacement</h2>
+          <div className="panel-actions">
+            {!isViewer && (
+              <button
+                className="btn btn-danger btn-sm"
+                onClick={() => setBulkDeletingAssets(assets.filter((a) => selectedIds.has(a.id)))}
+                disabled={selectedIds.size === 0}
+              >
+                <IconTrash /> Bulk Delete {selectedIds.size > 0 ? `(${selectedIds.size})` : ''}
+              </button>
+            )}
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => setShowExport(true)}
+              disabled={allAssets.length === 0}
+            >
+              <IconDownload /> Export
+            </button>
+            <button className="btn btn-ghost btn-sm" onClick={manualRefresh} disabled={loading}>
+              <IconRefresh /> Refresh
+            </button>
+          </div>
+        </div>
+        <AssetTable
+          assets={assets}
+          loading={loading}
+          onEdit={setEditingAsset}
+          onDelete={setDeletingAsset}
+          onBulkDelete={!isViewer ? setBulkDeletingAssets : undefined}
+          selectedIds={selectedIds}
+          onSelectionChange={setSelectedIds}
+          emptyMessage={`No assets are at or past the ${ASSET_LIFE_YEARS}-year service period (or year of acquisition is missing).`}
+          readonly={isViewer}
+        />
+      </section>
+
+      {!isViewer && editingAsset && (
+        <AssetFormModal
+          asset={editingAsset}
+          userRegion={userRegion}
+          existingAssets={allAssets}
+          onClose={() => setEditingAsset(null)}
+          onSaved={syncAfterMutation}
+          toast={toast}
+        />
+      )}
+      {!isViewer && deletingAsset && (
+        <DeleteConfirm asset={deletingAsset} onClose={() => setDeletingAsset(null)} onDeleted={syncAfterMutation} toast={toast} />
+      )}
+      {!isViewer && bulkDeletingAssets && (
+        <BulkDeleteConfirm
+          assets={bulkDeletingAssets}
+          onClose={() => { setBulkDeletingAssets(null); setSelectedIds(new Set()) }}
+          onDeleted={() => { syncAfterMutation(); setSelectedIds(new Set()) }}
+          toast={toast}
+        />
+      )}
+      {showExport && (
+        <ExportModal
+          assets={allAssets}
+          userRegion={userRegion}
+          onClose={() => setShowExport(false)}
+          initialScopeId="for_replacement"
+        />
+      )}
+      <ToastContainer toasts={toasts} />
+    </>
+  )
+}

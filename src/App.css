@@ -40,6 +40,73 @@
   padding: 1.75rem 2rem 3rem;
 }
 
+/* Floating warning: assets without New Property Number */
+.missing-npn-fab {
+  position: fixed;
+  bottom: 1.25rem;
+  left: calc(250px + 1.25rem);
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  max-width: min(300px, calc(100vw - 250px - 2.5rem));
+  padding: 0.75rem 0.95rem;
+  border-radius: var(--radius-lg, 12px);
+  border: 1px solid #fcd34d;
+  background: linear-gradient(135deg, #fffbeb 0%, #fff 100%);
+  box-shadow: 0 4px 20px rgba(180, 83, 9, 0.12), 0 1px 3px rgba(0, 0, 0, 0.06);
+  text-decoration: none;
+  color: #78350f;
+  font-size: 0.82rem;
+  line-height: 1.35;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.layout.sidebar-collapsed .missing-npn-fab {
+  left: calc(64px + 1.25rem);
+  max-width: min(300px, calc(100vw - 64px - 2.5rem));
+}
+
+.missing-npn-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px rgba(180, 83, 9, 0.16), 0 2px 6px rgba(0, 0, 0, 0.06);
+  color: #451a03;
+}
+
+.missing-npn-fab-icon {
+  flex-shrink: 0;
+  display: flex;
+  color: #d97706;
+  margin-top: 0.05rem;
+}
+
+.missing-npn-fab-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.missing-npn-fab-text {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.25rem 0.4rem;
+}
+
+.missing-npn-fab-count {
+  font-size: 1.05rem;
+  font-variant-numeric: tabular-nums;
+  color: #b45309;
+}
+
+.missing-npn-fab-label {
+  font-weight: 500;
+}
+
+.missing-npn-fab-npn {
+  font-weight: 700;
+  white-space: nowrap;
+}
+
 /* ── Page Header ── */
 .page-header {
   display: flex;
@@ -2704,6 +2771,7 @@ tbody tr:hover {
 
   .sidebar,
   .top-bar,
+  .missing-npn-fab,
   .scan-qr-history-panel,
   .scan-qr-no-print {
     display: none !important;
@@ -4235,6 +4303,15 @@ tbody tr:hover {
   .main-wrapper {
     margin-left: 0;
   }
+
+  .missing-npn-fab,
+  .layout.sidebar-collapsed .missing-npn-fab {
+    left: 0.75rem;
+    right: 0.75rem;
+    max-width: none;
+    bottom: 1rem;
+  }
+
   .main-content {
     padding: 1rem 0.75rem 3rem;
   }

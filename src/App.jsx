@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Outlet } from 'react-router-dom'
 import Sidebar from './components/Sidebar'
 import UserMenu from './components/UserMenu'
+import MissingNewPropertyNumberFab from './components/MissingNewPropertyNumberFab'
 import { useAuth } from './lib/useAuth'
 import { useInactivityLogout } from './lib/useInactivityLogout'
 import './App.css'
@@ -23,6 +24,7 @@ export default function App() {
         <main className="main-content">
           <Outlet />
         </main>
+        <MissingNewPropertyNumberFab />
       </div>
     </div>
   )

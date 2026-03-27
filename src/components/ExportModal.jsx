@@ -4,6 +4,7 @@ import {
   UNSERVICEABLE_STATUSES,
   TYPE_OPTIONS,
   TYPE_LABELS,
+  getAssetLifeInfo,
 } from '../lib/constants'
 import { exportAssetsToExcel } from '../lib/exportExcel'
 import { IconX, IconDownload } from './Icons'
@@ -12,6 +13,7 @@ const SCOPE_CHOICES = [
   { id: 'all', label: 'All assets' },
   { id: 'serviceable', label: 'Serviceable' },
   { id: 'unserviceable', label: 'Unserviceable / Obsolete' },
+  { id: 'for_replacement', label: 'For replacement (5+ yr)' },
 ]
 
 const TYPE_CHOICES = [{ id: 'all', label: 'All types' }, ...TYPE_OPTIONS.map((key) => ({ id: key, label: TYPE_LABELS[key] || key }))]
@@ -19,7 +21,9 @@ const TYPE_CHOICES = [{ id: 'all', label: 'All types' }, ...TYPE_OPTIONS.map((ke
 function matchesScope(asset, scopeId) {
   if (scopeId === 'all') return true
   if (scopeId === 'serviceable') return SERVICEABLE_STATUSES.includes(asset.status)
-  return UNSERVICEABLE_STATUSES.includes(asset.status)
+  if (scopeId === 'unserviceable') return UNSERVICEABLE_STATUSES.includes(asset.status)
+  if (scopeId === 'for_replacement') return getAssetLifeInfo(asset.yearOfAcquisition)?.forReplacement === true
+  return false
 }
 
 function matchesType(asset, typeKey) {
@@ -33,7 +37,15 @@ function filterAssets(assets, scopeId, typeKey) {
 
 function buildExportFilename(scopeId, typeKey, userRegion) {
   const scopePart =
-    scopeId === 'all' ? 'All' : scopeId === 'serviceable' ? 'Serviceable' : 'Unserviceable'
+    scopeId === 'all'
+      ? 'All'
+      : scopeId === 'serviceable'
+        ? 'Serviceable'
+        : scopeId === 'unserviceable'
+          ? 'Unserviceable'
+          : scopeId === 'for_replacement'
+            ? 'ForReplacement'
+            : 'Export'
   const typePart = typeKey === 'all' ? 'AllTypes' : typeKey
   const regionSegment =
     userRegion === 'all'
@@ -44,8 +56,8 @@ function buildExportFilename(scopeId, typeKey, userRegion) {
   return `PhilFIDA_${regionSegment}_${scopePart}_${typePart}`
 }
 
-export default function ExportModal({ assets, onClose, userRegion }) {
-  const [scopeId, setScopeId] = useState('all')
+export default function ExportModal({ assets, onClose, userRegion, initialScopeId = 'all' }) {
+  const [scopeId, setScopeId] = useState(initialScopeId)
   const [typeKey, setTypeKey] = useState('all')
 
   const filtered = useMemo(

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { onAuthStateChanged, signOut } from 'firebase/auth'
 import { getFirebaseAuth } from './firebase'
 import { AuthContext } from './authContext'
@@ -39,18 +39,25 @@ export function AuthProvider({ children }) {
       })
       return unsubscribe
     } catch (err) {
-      setConfigError(err?.message || 'Firebase is not configured.')
-      setLoading(false)
+      queueMicrotask(() => {
+        setConfigError(err?.message || 'Firebase is not configured.')
+        setLoading(false)
+      })
     }
   }, [])
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     try {
       await signOut(getFirebaseAuth())
     } catch {
       // ignore if auth not configured
     }
-  }
+  }, [])
+
+  const contextValue = useMemo(
+    () => ({ user, userRegion, userRole, loading, logout }),
+    [user, userRegion, userRole, loading, logout],
+  )
 
   if (configError) {
     return (
@@ -97,7 +104,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, userRegion, userRole, loading, logout }}>
+    <AuthContext.Provider value={contextValue}>
       {children}
     </AuthContext.Provider>
   )

@@ -2,23 +2,36 @@ import { useEffect, useRef, useCallback } from 'react'
 
 const INACTIVITY_MS = 30 * 60 * 1000 // 30 minutes
 const WARN_BEFORE_MS = 60 * 1000      // warn 1 minute before logout
+const RELOAD_INTENT_MS = 4000        // skip tab-close logout shortly after F5 / Ctrl+R
 
 const ACTIVITY_EVENTS = [
   'mousemove', 'mousedown', 'keydown',
   'touchstart', 'touchmove', 'scroll', 'click',
 ]
 
+function isReloadShortcut(e) {
+  if (e.key === 'F5') return true
+  const k = e.key?.toLowerCase?.()
+  if (k === 'r' && (e.ctrlKey || e.metaKey)) return true
+  return false
+}
+
 /**
  * Logs the user out after 30 minutes of inactivity.
  * Shows a 1-minute warning before signing out.
+ * Best-effort sign-out when the tab is closed or the user leaves the app (pagehide);
+ * keyboard refresh shortcuts are ignored so F5 / Ctrl+R do not always sign you out.
  *
- * @param {() => void} logout - the auth logout function
+ * @param {() => void | Promise<void>} logout - the auth logout function
  * @param {boolean} active - set to false when user is not authenticated (disables the hook)
  */
 export function useInactivityLogout(logout, active) {
+  const logoutRef = useRef(logout)
+
   const logoutTimer = useRef(null)
   const warnTimer = useRef(null)
   const warningToast = useRef(null)
+  const reloadIntentUntil = useRef(0)
 
   const clearTimers = useCallback(() => {
     if (logoutTimer.current) clearTimeout(logoutTimer.current)
@@ -71,9 +84,13 @@ export function useInactivityLogout(logout, active) {
     warnTimer.current = setTimeout(showWarning, INACTIVITY_MS - WARN_BEFORE_MS)
     logoutTimer.current = setTimeout(() => {
       clearTimers()
-      logout()
+      void logoutRef.current?.()
     }, INACTIVITY_MS)
-  }, [clearTimers, showWarning, logout])
+  }, [clearTimers, showWarning])
+
+  useEffect(() => {
+    logoutRef.current = logout
+  }, [logout])
 
   useEffect(() => {
     if (!active) {
@@ -83,15 +100,31 @@ export function useInactivityLogout(logout, active) {
 
     resetTimers()
 
+    const onKeyCapture = (e) => {
+      if (isReloadShortcut(e)) {
+        reloadIntentUntil.current = Date.now() + RELOAD_INTENT_MS
+      }
+    }
+
+    const onPageHide = (e) => {
+      if (e.persisted) return
+      if (Date.now() < reloadIntentUntil.current) return
+      void logoutRef.current?.()
+    }
+
     ACTIVITY_EVENTS.forEach((evt) =>
       window.addEventListener(evt, resetTimers, { passive: true })
     )
+    window.addEventListener('keydown', onKeyCapture, true)
+    window.addEventListener('pagehide', onPageHide)
 
     return () => {
       clearTimers()
       ACTIVITY_EVENTS.forEach((evt) =>
         window.removeEventListener(evt, resetTimers)
       )
+      window.removeEventListener('keydown', onKeyCapture, true)
+      window.removeEventListener('pagehide', onPageHide)
     }
   }, [active, resetTimers, clearTimers])
 }
