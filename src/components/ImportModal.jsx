@@ -45,6 +45,11 @@ function rowToImportPayload(row, userRegion) {
         : rest.serialNumber ?? null,
     issuedTo:
       typeof rest.issuedTo === 'string' ? rest.issuedTo.trim() || null : rest.issuedTo ?? null,
+    issuedAt: (() => {
+      const s = typeof rest.issuedAt === 'string' ? rest.issuedAt.trim() : ''
+      if (!s) return null
+      return /^\d{4}-\d{2}-\d{2}$/.test(s) ? s : null
+    })(),
     location:
       typeof rest.location === 'string' ? rest.location.trim() || null : rest.location ?? null,
     yearOfAcquisition: num(yearRaw),
@@ -100,6 +105,7 @@ function normalizeDraftFromParse(assets) {
     status: a.status || 'SPARE',
     serialNumber: a.serialNumber ?? '',
     issuedTo: a.issuedTo ?? '',
+    issuedAt: a.issuedAt ?? '',
     location: a.location ?? '',
     yearOfAcquisition: a.yearOfAcquisition ?? '',
     value: a.value ?? '',

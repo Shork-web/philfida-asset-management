@@ -22,6 +22,7 @@ export async function exportAssetsToExcel(assets, filename = 'PhilFIDA_Assets') 
       'UNIT OF MEASURE':              'UNIT',
       'TOTAL VALUE':                  formatValuePHP(a.value),
       'ISSUED TO':                    a.issuedTo || '',
+      'DATE ISSUED':                  a.issuedAt || '',
       'LOCATION':                     a.location || '',
       'QUANTITY per PROPERTY CARD':   a.quantityPerPropertyCard != null ? a.quantityPerPropertyCard : '',
       'QUANTITY per PHYSICAL COUNT':  a.quantityPerPhysicalCount != null ? a.quantityPerPhysicalCount : '',
@@ -36,11 +37,11 @@ export async function exportAssetsToExcel(assets, filename = 'PhilFIDA_Assets') 
 
   const colKeys = [
     'ARTICLE', 'DESCRIPTION', 'SERIAL NUMBER', 'OLD PROPERTY NUMBER', 'NEW PROPERTY NUMBER', 'YEAR OF ACQ.',
-    'UNIT OF MEASURE', 'TOTAL VALUE', 'ISSUED TO', 'LOCATION',
+    'UNIT OF MEASURE', 'TOTAL VALUE', 'ISSUED TO', 'DATE ISSUED', 'LOCATION',
     'QUANTITY per PROPERTY CARD', 'QUANTITY per PHYSICAL COUNT',
     'SHORTAGE/OVERAGE Quantity', 'SHORTAGE/OVERAGE Value', 'REMARKS',
   ]
-  const widths = [18, 48, 22, 20, 20, 14, 16, 16, 22, 22, 24, 24, 18, 18, 40]
+  const widths = [18, 48, 22, 20, 20, 14, 16, 16, 22, 14, 22, 24, 24, 18, 18, 40]
 
   worksheet.columns = colKeys.map((key, i) => ({ key, width: widths[i] }))
 

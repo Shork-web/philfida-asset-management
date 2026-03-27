@@ -1,8 +1,19 @@
 import { useMemo, useState } from 'react'
+import { format, isValid, parse } from 'date-fns'
 import { TYPE_OPTIONS, TYPE_LABELS, STATUS_OPTIONS, STATUS_LABELS, formatPHP, getAssetLifeInfo, ASSET_LIFE_YEARS } from '../lib/constants'
 import StatusBadge from './StatusBadge'
 import { IconEye, IconEdit, IconTrash, IconX, IconQrCode } from './Icons'
 import AssetQRModal from './AssetQRModal'
+
+function formatIssuedAtDisplay(ymd) {
+  if (!ymd) return null
+  try {
+    const d = parse(ymd, 'yyyy-MM-dd', new Date())
+    return isValid(d) ? format(d, 'MMM d, yyyy') : ymd
+  } catch {
+    return ymd
+  }
+}
 
 function formatLifeIndicator(info) {
   if (!info) return null
@@ -21,6 +32,7 @@ const SORT_FIELDS = [
   { key: 'type', label: 'Type' },
   { key: 'status', label: 'Status' },
   { key: 'issuedTo', label: 'Issued To' },
+  { key: 'issuedAt', label: 'Date Issued' },
   { key: 'location', label: 'Location' },
   { key: 'value', label: 'Total Value' },
   { key: 'yearOfAcquisition', label: 'Year of Acquisition' },
@@ -96,6 +108,7 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, onBulkDe
           hay(a.name).includes(q) ||
           hay(a.serialNumber).includes(q) ||
           hay(a.issuedTo).includes(q) ||
+          hay(a.issuedAt).includes(q) ||
           hay(a.location).includes(q) ||
           hay(a.subtype).includes(q),
       )
@@ -416,6 +429,14 @@ export default function AssetTable({ assets, loading, onEdit, onDelete, onBulkDe
                 <div className="detail-item">
                   <span className="detail-label">Issued To</span>
                   <span className="detail-value">{viewingAsset.issuedTo || <span className="text-muted">Unissued</span>}</span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Date issued</span>
+                  <span className="detail-value">
+                    {viewingAsset.issuedAt
+                      ? formatIssuedAtDisplay(viewingAsset.issuedAt)
+                      : <span className="text-muted">—</span>}
+                  </span>
                 </div>
                 <div className="detail-item">
                   <span className="detail-label">Location</span>

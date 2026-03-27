@@ -172,6 +172,7 @@ export const EMPTY_FORM = {
   status: 'SPARE',
   serialNumber: '',
   issuedTo: '',
+  issuedAt: '',
   location: '',
   yearOfAcquisition: '',
   value: '',

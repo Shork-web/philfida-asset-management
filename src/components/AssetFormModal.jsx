@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { format, isValid, parseISO } from 'date-fns'
+import { format, isValid, parse, parseISO } from 'date-fns'
 import { createAsset, updateAsset, getAssetDuplicateMessages } from '../lib/api'
 import { STATUS_OPTIONS, STATUS_LABELS, TYPE_OPTIONS, TYPE_LABELS, SUBTYPE_OPTIONS, EMPTY_FORM } from '../lib/constants'
 import { IconX } from './Icons'
@@ -11,6 +11,16 @@ function formatIssuedHistoryDate(iso) {
     return isValid(d) ? format(d, 'MMM d, yyyy h:mm a') : iso
   } catch {
     return iso
+  }
+}
+
+function formatAssignedDate(ymd) {
+  if (!ymd) return ''
+  try {
+    const d = parse(ymd, 'yyyy-MM-dd', new Date())
+    return isValid(d) ? format(d, 'MMM d, yyyy') : ymd
+  } catch {
+    return ymd
   }
 }
 
@@ -39,6 +49,7 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
           status: asset.status,
           serialNumber: asset.serialNumber || '',
           issuedTo: asset.issuedTo || '',
+          issuedAt: asset.issuedAt || '',
           location: asset.location || '',
           yearOfAcquisition: asset.yearOfAcquisition != null ? String(asset.yearOfAcquisition) : '',
           value: asset.value != null ? String(asset.value) : '',
@@ -79,6 +90,7 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
       status: form.status,
       serialNumber: form.serialNumber.trim() || null,
       issuedTo: form.issuedTo.trim() || null,
+      issuedAt: form.issuedAt.trim() ? form.issuedAt.trim() : null,
       location: form.location.trim() || null,
       yearOfAcquisition: form.yearOfAcquisition ? Number(form.yearOfAcquisition) : null,
       value: form.value ? Number(form.value) : null,
@@ -197,6 +209,20 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
               <div className="form-group">
                 <label htmlFor="af-issuedTo">Issued To</label>
                 <input id="af-issuedTo" name="issuedTo" placeholder="Person name" value={form.issuedTo} onChange={onChange} />
+              </div>
+              <div className="form-group">
+                <label htmlFor="af-issuedAt">Date issued <span className="af-optional">Optional</span></label>
+                <input
+                  id="af-issuedAt"
+                  name="issuedAt"
+                  type="date"
+                  value={form.issuedAt}
+                  onChange={onChange}
+                  title="When the asset was assigned to the staff member"
+                />
+                {form.issuedAt && (
+                  <p className="af-field-hint">{formatAssignedDate(form.issuedAt)}</p>
+                )}
               </div>
               <div className="form-group">
                 <label htmlFor="af-location">Location</label>

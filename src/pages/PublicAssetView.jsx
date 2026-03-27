@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchAssetById } from '../lib/api'
+import { format, isValid, parse } from 'date-fns'
 import { TYPE_LABELS, formatPHP, getAssetLifeInfo } from '../lib/constants'
 import StatusBadge from '../components/StatusBadge'
 
@@ -8,6 +9,16 @@ export default function PublicAssetView() {
   const { assetId: rawId } = useParams()
   const assetId = rawId ? decodeURIComponent(rawId).trim() : ''
   const missingId = !assetId
+
+  function formatIssuedAt(ymd) {
+    if (!ymd) return null
+    try {
+      const d = parse(ymd, 'yyyy-MM-dd', new Date())
+      return isValid(d) ? format(d, 'MMM d, yyyy') : ymd
+    } catch {
+      return ymd
+    }
+  }
 
   const [asset, setAsset] = useState(null)
   const [loading, setLoading] = useState(false)
@@ -152,6 +163,7 @@ export default function PublicAssetView() {
                 <h3>Assignment & location</h3>
                 <dl className="public-asset-dl">
                   <div><dt>Issued to</dt><dd>{asset.issuedTo || '—'}</dd></div>
+                  <div><dt>Date issued</dt><dd>{formatIssuedAt(asset.issuedAt) || '—'}</dd></div>
                   <div><dt>Location</dt><dd>{asset.location || '—'}</dd></div>
                   <div><dt>Region</dt><dd>{asset.region ? `Region ${asset.region}` : '—'}</dd></div>
                 </dl>

@@ -70,6 +70,20 @@ function parseNum(val) {
   return isNaN(n) ? null : n
 }
 
+/** @param {unknown} val */
+function parseIssuedAt(val) {
+  if (val == null || val === '') return null
+  if (val instanceof Date) {
+    const y = val.getFullYear()
+    const mo = String(val.getMonth() + 1).padStart(2, '0')
+    const da = String(val.getDate()).padStart(2, '0')
+    return `${y}-${mo}-${da}`
+  }
+  const s = String(val).trim()
+  const m = s.match(/^(\d{4}-\d{2}-\d{2})/)
+  return m ? m[1] : null
+}
+
 export async function parseAssetsFromExcel(buffer) {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
@@ -79,7 +93,7 @@ export async function parseAssetsFromExcel(buffer) {
   const errors = []
   const headerNames = [
     'ARTICLE', 'DESCRIPTION', 'SERIAL NUMBER', 'OLD PROPERTY NUMBER', 'NEW PROPERTY NUMBER', 'YEAR OF ACQ.',
-    'TOTAL VALUE', 'ISSUED TO', 'LOCATION',
+    'TOTAL VALUE', 'ISSUED TO', 'DATE ISSUED', 'LOCATION',
     'QUANTITY per PROPERTY CARD', 'QUANTITY per PHYSICAL COUNT', 'REMARKS',
   ]
 
@@ -163,6 +177,7 @@ export async function parseAssetsFromExcel(buffer) {
       status: 'SPARE',
       serialNumber,
       issuedTo: get('ISSUED TO') || null,
+      issuedAt: parseIssuedAt(get('DATE ISSUED')) || null,
       location: get('LOCATION') || null,
       yearOfAcquisition: parseYear(get('YEAR OF ACQ.')),
       value: parseValue(get('TOTAL VALUE')),

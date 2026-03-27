@@ -43,6 +43,30 @@ export function normalizeIssuedToHistory(raw) {
 
 const ISSUED_TO_HISTORY_MAX = 50
 
+/** @param {unknown} raw */
+function normalizeIssuedAt(raw) {
+  if (raw == null || raw === '') return null
+  if (typeof raw === 'string') {
+    const m = raw.trim().match(/^(\d{4}-\d{2}-\d{2})/)
+    return m ? m[1] : null
+  }
+  if (raw instanceof Timestamp) {
+    const d = raw.toDate()
+    const y = d.getFullYear()
+    const mo = String(d.getMonth() + 1).padStart(2, '0')
+    const da = String(d.getDate()).padStart(2, '0')
+    return `${y}-${mo}-${da}`
+  }
+  if (raw && typeof raw.toDate === 'function') {
+    const d = raw.toDate()
+    const y = d.getFullYear()
+    const mo = String(d.getMonth() + 1).padStart(2, '0')
+    const da = String(d.getDate()).padStart(2, '0')
+    return `${y}-${mo}-${da}`
+  }
+  return null
+}
+
 function toAssetData(docSnap) {
   if (!docSnap.exists()) return null
   const d = docSnap.data()
@@ -57,6 +81,7 @@ function toAssetData(docSnap) {
     status: d.status ?? 'SPARE',
     serialNumber: d.serialNumber ?? null,
     issuedTo: d.issuedTo ?? null,
+    issuedAt: normalizeIssuedAt(d.issuedAt),
     issuedToHistory: normalizeIssuedToHistory(d.issuedToHistory),
     location: d.location ?? null,
     yearOfAcquisition: d.yearOfAcquisition ?? null,
@@ -211,6 +236,7 @@ function mapAssetDocumentSnapshot(docSnap) {
     assignedTo: data.assignedTo ?? null,
     purchaseDate: data.purchaseDate ?? null,
     notes: data.notes ?? null,
+    issuedAt: normalizeIssuedAt(data.issuedAt),
     issuedToHistory: normalizeIssuedToHistory(data.issuedToHistory),
     region: data.region ?? null,
     createdAt: fromTimestamp(data.createdAt),
@@ -308,6 +334,7 @@ export async function createAsset(payload) {
     status: payload.status ?? 'SPARE',
     serialNumber: payload.serialNumber ?? null,
     issuedTo: payload.issuedTo ?? null,
+    issuedAt: normalizeIssuedAt(payload.issuedAt),
     issuedToHistory: [],
     location: payload.location ?? null,
     yearOfAcquisition: payload.yearOfAcquisition ?? null,
@@ -332,7 +359,7 @@ export async function updateAsset(id, payload) {
   }
   const prev = prevSnap.data()
   const prevIssued = String(prev.issuedTo ?? '').trim()
-  const { issuedToHistory: _discardHistory, ...rest } = payload
+  const { issuedToHistory: _discardHistory, issuedAt: rawIssuedAt, ...rest } = payload
   const nextIssued = String(rest.issuedTo ?? '').trim()
 
   let history = normalizeIssuedToHistory(prev.issuedToHistory)
@@ -345,6 +372,7 @@ export async function updateAsset(id, payload) {
 
   await updateDoc(ref, {
     ...rest,
+    issuedAt: normalizeIssuedAt(rawIssuedAt),
     issuedToHistory: history,
     updatedAt: serverTimestamp(),
   })

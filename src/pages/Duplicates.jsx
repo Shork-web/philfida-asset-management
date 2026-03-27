@@ -1,4 +1,5 @@
 import { useCallback, useMemo, useState } from 'react'
+import { format, isValid, parse } from 'date-fns'
 import { useAuth } from '../lib/useAuth'
 import { findAssetDuplicateGroups, getUniqueAssetIdsInDuplicateGroups } from '../lib/api'
 import { useAssetsSubscription } from '../lib/useAssetsSubscription'
@@ -10,6 +11,16 @@ import DeleteConfirm from '../components/DeleteConfirm'
 import { useToasts } from '../lib/useToasts'
 import { ToastContainer } from '../components/Toasts'
 import { IconRefresh, IconEdit, IconEye, IconX, IconQrCode, IconTrash } from '../components/Icons'
+
+function formatIssuedAtDisplay(ymd) {
+  if (!ymd) return null
+  try {
+    const d = parse(ymd, 'yyyy-MM-dd', new Date())
+    return isValid(d) ? format(d, 'MMM d, yyyy') : ymd
+  } catch {
+    return ymd
+  }
+}
 
 function formatLifeIndicator(info) {
   if (!info) return null
@@ -323,6 +334,14 @@ export default function Duplicates() {
                   <span className="detail-label">Issued To</span>
                   <span className="detail-value">
                     {viewingAsset.issuedTo || <span className="text-muted">Unissued</span>}
+                  </span>
+                </div>
+                <div className="detail-item">
+                  <span className="detail-label">Date issued</span>
+                  <span className="detail-value">
+                    {viewingAsset.issuedAt
+                      ? formatIssuedAtDisplay(viewingAsset.issuedAt)
+                      : <span className="text-muted">—</span>}
                   </span>
                 </div>
                 <div className="detail-item">

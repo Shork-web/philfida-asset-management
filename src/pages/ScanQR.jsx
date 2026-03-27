@@ -6,6 +6,7 @@ import {
   decodePhilFidaAssetFromImageData,
   decodePhilFidaAssetFromVideoFrame,
 } from '../lib/qrDecode'
+import { format, isValid, parse } from 'date-fns'
 import { TYPE_LABELS, formatPHP, getAssetLifeInfo } from '../lib/constants'
 import StatusBadge from '../components/StatusBadge'
 
@@ -17,6 +18,16 @@ function checkSecureContext() {
 }
 
 const secureOk = checkSecureContext()
+
+function formatIssuedAtDisplay(ymd) {
+  if (!ymd) return null
+  try {
+    const d = parse(ymd, 'yyyy-MM-dd', new Date())
+    return isValid(d) ? format(d, 'MMM d, yyyy') : ymd
+  } catch {
+    return ymd
+  }
+}
 
 export default function ScanQR() {
   const { pathname } = useLocation()
@@ -487,6 +498,7 @@ export default function ScanQR() {
                   <h3>Assignment & location</h3>
                   <dl className="scan-qr-result-dl">
                     <div><dt>Issued to</dt><dd>{scanResult.issuedTo || '—'}</dd></div>
+                    <div><dt>Date issued</dt><dd>{formatIssuedAtDisplay(scanResult.issuedAt) || '—'}</dd></div>
                     <div><dt>Location</dt><dd>{scanResult.location || '—'}</dd></div>
                     <div><dt>Region</dt><dd>{scanResult.region ? `Region ${scanResult.region}` : '—'}</dd></div>
                   </dl>

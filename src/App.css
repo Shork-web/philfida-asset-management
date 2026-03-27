@@ -916,6 +916,12 @@ tbody tr:hover {
   margin-left: 4px;
 }
 
+.af-field-hint {
+  margin: 0.3rem 0 0;
+  font-size: 0.75rem;
+  color: var(--color-gray-500);
+}
+
 .af-history-empty {
   margin: 0;
   font-size: 0.82rem;
