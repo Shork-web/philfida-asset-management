@@ -95,6 +95,15 @@ export async function parseAssetsFromExcel(buffer) {
     return { assets: [], errors: ['Could not find template column headers (ARTICLE, DESCRIPTION, etc.).'] }
   }
 
+  if (!colMap['NEW PROPERTY NUMBER']) {
+    return {
+      assets: [],
+      errors: [
+        'The file must include a NEW PROPERTY NUMBER column (same header as the export template). Add the column and try again.',
+      ],
+    }
+  }
+
   // Start after header row(s). If row 2 looks like sub-headers (Quantity, Value), skip it too.
   let startRow = (headerRow.number || 1) + 1
   const row2 = worksheet.getRow(2)
@@ -110,6 +119,8 @@ export async function parseAssetsFromExcel(buffer) {
   }
 
   const assets = []
+  /** Excel row numbers where a data row is present but NEW PROPERTY NUMBER is blank */
+  const missingNewPropertyNumberRows = []
 
   worksheet.eachRow(function (row, rowNumber) {
     if (rowNumber < startRow) return
@@ -132,6 +143,12 @@ export async function parseAssetsFromExcel(buffer) {
     const articleNorm = normalize(articleStr)
     if (headerNames.some(function (h) { return normalize(h) === articleNorm })) return
 
+    const newPropRaw = get('NEW PROPERTY NUMBER')
+    if (!String(newPropRaw ?? '').trim()) {
+      missingNewPropertyNumberRows.push(rowNumber)
+      return
+    }
+
     const parsed = parseArticle(articleStr)
     const descParsed = parseDescription(descStr)
     const serialFromCol = get('SERIAL NUMBER')
@@ -139,7 +156,7 @@ export async function parseAssetsFromExcel(buffer) {
 
     const asset = {
       assetTag: assetTag || '',
-      newPropertyNumber: get('NEW PROPERTY NUMBER') || null,
+      newPropertyNumber: String(newPropRaw).trim(),
       name: (descParsed.name || nameFromDesc) || '',
       type: parsed.type,
       subtype: parsed.subtype,
@@ -156,6 +173,14 @@ export async function parseAssetsFromExcel(buffer) {
 
     assets.push(asset)
   })
+
+  if (missingNewPropertyNumberRows.length > 0) {
+    const rows = [...missingNewPropertyNumberRows].sort((a, b) => a - b)
+    errors.push(
+      `NEW PROPERTY NUMBER is required for every data row. It is empty on Excel row(s): ${rows.join(', ')}. Fill in those cells and upload again.`,
+    )
+    return { assets: [], errors }
+  }
 
   return { assets, errors }
 }

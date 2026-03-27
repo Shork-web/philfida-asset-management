@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useMemo } from 'react'
 import { parseAssetsFromExcel } from '../lib/importExcel'
 import { createAsset, getAssetDuplicateMessages } from '../lib/api'
 import {
@@ -54,6 +54,39 @@ function rowToImportPayload(row, userRegion) {
     notes: typeof rest.notes === 'string' ? rest.notes.trim() || null : rest.notes ?? null,
     region: userRegion && userRegion !== 'all' ? userRegion : null,
   }
+}
+
+/**
+ * Same order as import: each row is checked against Firestore-backed assets plus
+ * synthetic entries for earlier valid rows in this file (new #, old #, serial).
+ * @returns {Array<{ rowNum: number, messages: string[] }>}
+ */
+function computeImportDuplicateIssues(draftRows, existingAssets, userRegion) {
+  if (!draftRows?.length) return []
+  const issues = []
+  const cumulative = [...(existingAssets || [])]
+
+  draftRows.forEach((row, index) => {
+    const payload = rowToImportPayload(row, userRegion)
+    const rowNum = index + 1
+    if (!payload.name?.trim() || !String(payload.newPropertyNumber ?? '').trim()) {
+      return
+    }
+    const dupMsgs = getAssetDuplicateMessages(payload, cumulative, undefined)
+    if (dupMsgs.length > 0) {
+      issues.push({ rowNum, messages: dupMsgs })
+      return
+    }
+    cumulative.push({
+      id: `import-preview-${row.__draftId}`,
+      name: payload.name,
+      newPropertyNumber: payload.newPropertyNumber,
+      assetTag: payload.assetTag,
+      serialNumber: payload.serialNumber,
+    })
+  })
+
+  return issues
 }
 
 function normalizeDraftFromParse(assets) {
@@ -113,6 +146,28 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
     })
   }, [])
 
+  const missingNpnRowNums = useMemo(() => {
+    if (!draftRows?.length) return []
+    return draftRows
+      .map((r, i) => (!String(r.newPropertyNumber ?? '').trim() ? i + 1 : null))
+      .filter((x) => x != null)
+  }, [draftRows])
+
+  const importDuplicateIssues = useMemo(
+    () => computeImportDuplicateIssues(draftRows, existingAssets, userRegion),
+    [draftRows, existingAssets, userRegion],
+  )
+
+  const duplicateRowNums = useMemo(
+    () => new Set(importDuplicateIssues.map((i) => i.rowNum)),
+    [importDuplicateIssues],
+  )
+
+  const canImport =
+    draftRows?.length > 0 &&
+    missingNpnRowNums.length === 0 &&
+    importDuplicateIssues.length === 0
+
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -122,7 +177,7 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
       const buffer = await file.arrayBuffer()
       const { assets, errors } = await parseAssetsFromExcel(buffer)
       if (errors?.length) {
-        setError(errors[0])
+        setError(errors.length > 1 ? errors.join(' ') : errors[0])
         return
       }
       if (!assets?.length) {
@@ -138,20 +193,36 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
 
   const handleImport = async () => {
     if (!draftRows?.length) return
+    const missingNpn = draftRows
+      .map((r, i) => (!String(r.newPropertyNumber ?? '').trim() ? i + 1 : null))
+      .filter((x) => x != null)
+    if (missingNpn.length > 0) {
+      const msg = `NEW PROPERTY NUMBER is required for every row. It is missing on row(s) ${missingNpn.join(', ')} (table order). Fill them in or remove those rows, then try Import again.`
+      setError(msg)
+      toast(msg, 'error')
+      return
+    }
+    const dupPrecheck = computeImportDuplicateIssues(draftRows, existingAssets, userRegion)
+    if (dupPrecheck.length > 0) {
+      const msg = `Resolve duplicate serial or property numbers on the listed rows before importing (${dupPrecheck.length} row${dupPrecheck.length !== 1 ? 's' : ''}).`
+      toast(msg, 'error')
+      return
+    }
+    setError(null)
     setImporting(true)
     let success = 0
     let failed = 0
-    let skippedDup = 0
     const cumulative = [...existingAssets]
     for (const row of draftRows) {
       const payload = rowToImportPayload(row, userRegion)
-      if (!payload.name?.trim()) {
+      if (!payload.name?.trim() || !String(payload.newPropertyNumber ?? '').trim()) {
         failed++
         continue
       }
       const dupMsgs = getAssetDuplicateMessages(payload, cumulative, undefined)
       if (dupMsgs.length > 0) {
-        skippedDup++
+        failed++
+        console.warn('Import duplicate slipped past pre-check:', payload, dupMsgs)
         continue
       }
       try {
@@ -169,14 +240,11 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
       onImported()
       onClose()
     }
-    if (skippedDup > 0) {
+    if (failed > 0) {
       toast(
-        `${skippedDup} row${skippedDup !== 1 ? 's' : ''} skipped (duplicate serial or property number vs existing data or earlier rows in this file).`,
+        `${failed} row${failed !== 1 ? 's' : ''} skipped or failed (e.g. missing name, missing new property number, or server error).`,
         'error',
       )
-    }
-    if (failed > 0) {
-      toast(`${failed} row${failed !== 1 ? 's' : ''} skipped or failed (e.g. missing name or server error).`, 'error')
     }
   }
 
@@ -202,7 +270,8 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
         <div className="modal-body">
           <p className="import-hint">
             Upload an Excel file in the export template format. After loading, <strong>review and edit</strong> rows below,
-            then click Import. Columns: ARTICLE → type/subtype, DESCRIPTION → name (optional S/N in text), SERIAL NUMBER,
+            then click Import. <strong>NEW PROPERTY NUMBER</strong> is required on every row (imports are blocked if it is missing).
+            Columns: ARTICLE → type/subtype, DESCRIPTION → name (optional S/N in text), SERIAL NUMBER,
             OLD/NEW property numbers,
             year, value, issued to, location, quantities, remarks.
           </p>
@@ -244,8 +313,39 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
                 </p>
               </div>
               <p className="import-draft-hint">
-                Edit any cell below. Use <strong>Remove</strong> to drop a row before importing. Duplicates are still checked on Import.
+                Edit any cell below. Use <strong>Remove</strong> to drop a row. <strong>Import</strong> stays disabled until every row has a New # and no duplicate new/old property number or serial (vs the registry or another row in this file).
               </p>
+
+              {missingNpnRowNums.length > 0 && (
+                <div className="import-block-banner import-block-banner-npn" role="status">
+                  <strong>Missing New #</strong>
+                  <p>
+                    Row{missingNpnRowNums.length !== 1 ? 's' : ''} <strong>{missingNpnRowNums.join(', ')}</strong> need a NEW PROPERTY NUMBER before you can import.
+                  </p>
+                </div>
+              )}
+
+              {importDuplicateIssues.length > 0 && (
+                <div className="import-block-banner import-block-banner-dup" role="alert">
+                  <strong>Duplicate values — import blocked</strong>
+                  <p className="import-block-banner-lead">
+                    These rows clash with an asset already in the system or with an earlier row in this table. Change the New #, Old #, or Serial, or remove the row.
+                  </p>
+                  <ul className="import-dup-issue-list">
+                    {importDuplicateIssues.map(({ rowNum, messages }) => (
+                      <li key={rowNum} className="import-dup-issue-item">
+                        <span className="import-dup-issue-row">Row {rowNum}</span>
+                        <ul className="import-dup-issue-msgs">
+                          {messages.map((m, j) => (
+                            <li key={j}>{m}</li>
+                          ))}
+                        </ul>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
               <div className="import-draft-wrap">
                 <table className="import-draft-table">
                   <thead>
@@ -318,8 +418,16 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
                   <tbody>
                     {draftRows.map((row, index) => {
                       const subtypes = SUBTYPE_OPTIONS[row.type] || []
+                      const rowNum = index + 1
+                      const isDupRow = duplicateRowNums.has(rowNum)
+                      const isNpnMissing = !String(row.newPropertyNumber ?? '').trim()
                       return (
-                        <tr key={row.__draftId}>
+                        <tr
+                          key={row.__draftId}
+                          className={
+                            isDupRow ? 'import-draft-row-dup' : isNpnMissing ? 'import-draft-row-npn' : undefined
+                          }
+                        >
                           <td className="import-col-idx-cell import-sticky-left">
                             <span className="import-row-num">{index + 1}</span>
                           </td>
@@ -487,7 +595,16 @@ export default function ImportModal({ userRegion, existingAssets = [], onClose, 
               type="button"
               className="btn btn-primary"
               onClick={handleImport}
-              disabled={importing || draftRows.length === 0}
+              disabled={importing || !canImport}
+              title={
+                !canImport && draftRows.length > 0
+                  ? missingNpnRowNums.length
+                    ? 'Fill in New # on every row'
+                    : importDuplicateIssues.length
+                      ? 'Fix duplicate property numbers or serials listed above'
+                      : undefined
+                  : undefined
+              }
             >
               {importing ? 'Importing…' : `Import ${draftRows.length} asset${draftRows.length !== 1 ? 's' : ''}`}
             </button>
