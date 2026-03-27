@@ -14,6 +14,16 @@ function formatIssuedHistoryDate(iso) {
   }
 }
 
+function formatIsoDateOnly(iso) {
+  if (!iso) return ''
+  try {
+    const d = parseISO(iso)
+    return isValid(d) ? format(d, 'MMM d, yyyy') : iso
+  } catch {
+    return iso
+  }
+}
+
 function formatAssignedDate(ymd) {
   if (!ymd) return ''
   try {
@@ -283,7 +293,7 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
               {!isEdit && (
                 <p className="af-history-empty">
                   After this asset is saved, each time you change <strong>Issued to</strong> and save, the previous assignee
-                  is listed here with their <strong>Date issued</strong> (if set) and when they were reassigned (newest first).
+                  is listed here with Date Assigned, Date Re-Assigned, and Date inputed in the system (newest first).
                 </p>
               )}
               {isEdit && localIssuedHistory.length === 0 && (
@@ -318,15 +328,23 @@ export default function AssetFormModal({ asset, userRegion, existingAssets = [],
                       </div>
                       <div className="af-issued-history-dates">
                         <div className="af-issued-history-row">
-                          <span className="af-issued-history-label">Date issued to staff</span>
+                          <span className="af-issued-history-label">Date Assigned</span>
                           <span className="af-issued-history-value">
                             {entry.issuedAt ? formatAssignedDate(entry.issuedAt) : '—'}
                           </span>
                         </div>
                         <div className="af-issued-history-row">
-                          <span className="af-issued-history-label">Reassigned (next staff)</span>
+                          <span className="af-issued-history-label">Date Re-Assigned</span>
                           <span className="af-issued-history-value">
-                            {entry.changedAt ? formatIssuedHistoryDate(entry.changedAt) : '—'}
+                            {entry.changedAt ? formatIsoDateOnly(entry.changedAt) : '—'}
+                          </span>
+                        </div>
+                        <div className="af-issued-history-row">
+                          <span className="af-issued-history-label">Date inputed in the system</span>
+                          <span className="af-issued-history-value">
+                            {entry.assigneeRecordedAt
+                              ? formatIssuedHistoryDate(entry.assigneeRecordedAt)
+                              : '—'}
                           </span>
                         </div>
                       </div>

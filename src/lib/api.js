@@ -49,9 +49,18 @@ function normalizeIssuedAt(raw) {
   return null
 }
 
+/** ISO string for nested history fields (Timestamp or string). */
+function toIsoForHistoryField(raw) {
+  if (raw == null || raw === '') return null
+  if (raw instanceof Timestamp) return raw.toDate().toISOString()
+  if (typeof raw === 'string') return raw.trim() || null
+  if (raw && typeof raw.toDate === 'function') return raw.toDate().toISOString()
+  return null
+}
+
 /**
  * @param {unknown} raw
- * @returns {{ name: string, changedAt: string, issuedAt: string|null }[]}
+ * @returns {{ name: string, changedAt: string, issuedAt: string|null, assigneeRecordedAt: string|null }[]}
  */
 export function normalizeIssuedToHistory(raw) {
   if (!Array.isArray(raw)) return []
@@ -65,7 +74,8 @@ export function normalizeIssuedToHistory(raw) {
     if (ca instanceof Timestamp) changedAt = ca.toDate().toISOString()
     else if (typeof ca === 'string') changedAt = ca
     else if (ca && typeof ca.toDate === 'function') changedAt = ca.toDate().toISOString()
-    out.push({ name, changedAt, issuedAt: normalizeIssuedAt(e.issuedAt) })
+    const assigneeRecordedAt = toIsoForHistoryField(e.assigneeRecordedAt)
+    out.push({ name, changedAt, issuedAt: normalizeIssuedAt(e.issuedAt), assigneeRecordedAt })
   }
   return out
 }
@@ -85,6 +95,7 @@ function toAssetData(docSnap) {
     serialNumber: d.serialNumber ?? null,
     issuedTo: d.issuedTo ?? null,
     issuedAt: normalizeIssuedAt(d.issuedAt),
+    assigneeRecordedAt: fromTimestamp(d.assigneeRecordedAt),
     issuedToHistory: normalizeIssuedToHistory(d.issuedToHistory),
     location: d.location ?? null,
     yearOfAcquisition: d.yearOfAcquisition ?? null,
@@ -240,6 +251,7 @@ function mapAssetDocumentSnapshot(docSnap) {
     purchaseDate: data.purchaseDate ?? null,
     notes: data.notes ?? null,
     issuedAt: normalizeIssuedAt(data.issuedAt),
+    assigneeRecordedAt: fromTimestamp(data.assigneeRecordedAt),
     issuedToHistory: normalizeIssuedToHistory(data.issuedToHistory),
     region: data.region ?? null,
     createdAt: fromTimestamp(data.createdAt),
@@ -338,6 +350,7 @@ export async function createAsset(payload) {
     serialNumber: payload.serialNumber ?? null,
     issuedTo: payload.issuedTo ?? null,
     issuedAt: normalizeIssuedAt(payload.issuedAt),
+    assigneeRecordedAt: String(payload.issuedTo ?? '').trim() ? serverTimestamp() : null,
     issuedToHistory: [],
     location: payload.location ?? null,
     yearOfAcquisition: payload.yearOfAcquisition ?? null,
@@ -362,7 +375,12 @@ export async function updateAsset(id, payload) {
   }
   const prev = prevSnap.data()
   const prevIssued = String(prev.issuedTo ?? '').trim()
-  const { issuedToHistory: _discardHistory, issuedAt: rawIssuedAt, ...rest } = payload
+  const {
+    issuedToHistory: _discardHistory,
+    issuedAt: rawIssuedAt,
+    assigneeRecordedAt: _ignoreAssigneeRecordedAt,
+    ...rest
+  } = payload
   const nextIssued = String(rest.issuedTo ?? '').trim()
 
   let history = normalizeIssuedToHistory(prev.issuedToHistory)
@@ -372,9 +390,16 @@ export async function updateAsset(id, payload) {
         name: prevIssued,
         issuedAt: normalizeIssuedAt(prev.issuedAt),
         changedAt: new Date().toISOString(),
+        assigneeRecordedAt: toIsoForHistoryField(prev.assigneeRecordedAt),
       },
       ...history,
     ].slice(0, ISSUED_TO_HISTORY_MAX)
+  }
+
+  /** When assignee changes: stamp new assignee; when cleared: null. Unchanged assignee: leave field out of update. */
+  let assigneeRecordedAtPatch = undefined
+  if (prevIssued !== nextIssued) {
+    assigneeRecordedAtPatch = nextIssued ? serverTimestamp() : null
   }
 
   await updateDoc(ref, {
@@ -382,6 +407,7 @@ export async function updateAsset(id, payload) {
     issuedAt: normalizeIssuedAt(rawIssuedAt),
     issuedToHistory: history,
     updatedAt: serverTimestamp(),
+    ...(assigneeRecordedAtPatch !== undefined ? { assigneeRecordedAt: assigneeRecordedAtPatch } : {}),
   })
   const snap = await getDoc(ref)
   return toAssetData(snap)
@@ -405,6 +431,7 @@ export async function replaceIssuedToHistory(id, entries) {
     name: e.name,
     changedAt: e.changedAt,
     issuedAt: e.issuedAt ?? null,
+    assigneeRecordedAt: e.assigneeRecordedAt ?? null,
   }))
   await updateDoc(ref, {
     issuedToHistory: forStore,
