@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { fetchAssetById } from '../lib/api'
 import { TYPE_LABELS, formatPHP, getAssetLifeInfo } from '../lib/constants'
@@ -12,12 +12,22 @@ export default function PublicAssetView() {
   const [asset, setAsset] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [printTimestamp, setPrintTimestamp] = useState(null)
+
+  const handlePrintRecord = useCallback(() => {
+    const ts = new Date().toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })
+    setPrintTimestamp(ts)
+    window.setTimeout(() => {
+      window.print()
+    }, 150)
+  }, [])
 
   useEffect(() => {
     if (missingId) return undefined
     let cancelled = false
     queueMicrotask(() => {
       if (cancelled) return
+      setPrintTimestamp(null)
       setLoading(true)
       setError(null)
       setAsset(null)
@@ -49,7 +59,7 @@ export default function PublicAssetView() {
 
   return (
     <div className="public-asset-page">
-      <header className="public-asset-header">
+      <header className={`public-asset-header${asset ? ' scan-qr-no-print' : ''}`}>
         <div className="public-asset-brand">
           <span className="public-asset-brand-mark" aria-hidden />
           <div>
@@ -109,7 +119,11 @@ export default function PublicAssetView() {
         )}
 
         {!missingId && !loading && asset && (
-          <article className="public-asset-card">
+          <article className="public-asset-card scan-qr-print-area">
+            <div className="scan-qr-print-only scan-qr-print-dochead">PhilFIDA — Public asset record</div>
+            {printTimestamp && (
+              <p className="scan-qr-print-only scan-qr-print-meta">Printed {printTimestamp}</p>
+            )}
             <div className="public-asset-hero">
               <h2 className="public-asset-name">{asset.name || 'Unnamed asset'}</h2>
               <div className="public-asset-ids">
@@ -186,6 +200,17 @@ export default function PublicAssetView() {
                 <p>{asset.notes}</p>
               </div>
             )}
+
+            <div className="scan-qr-result-actions scan-qr-no-print">
+              <button type="button" className="btn btn-ghost scan-qr-print-action" onClick={handlePrintRecord}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                  <path d="M6 9V2h12v7" />
+                  <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                  <rect x="6" y="14" width="12" height="8" rx="1" />
+                </svg>
+                Print
+              </button>
+            </div>
 
             <p className="public-asset-footnote">
               Information reflects the registry at load time. For corrections, contact your PhilFIDA administrator.

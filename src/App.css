@@ -2772,6 +2772,49 @@ tbody tr:hover {
     padding-bottom: 0.65rem;
     border-bottom: 1px solid #d1d5db;
   }
+
+  /* Public /a/:id page (no app shell): print only the asset card */
+  .public-asset-page {
+    background: #fff !important;
+    min-height: auto !important;
+  }
+
+  .public-asset-main {
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .public-asset-card {
+    box-shadow: none !important;
+    border: 1px solid #bbb !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .public-asset-card > .scan-qr-print-dochead {
+    margin: 1rem 1.25rem 0;
+  }
+
+  .public-asset-card > .scan-qr-print-meta {
+    margin-left: 1.25rem;
+    margin-right: 1.25rem;
+  }
+
+  .public-asset-hero {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .public-asset-section {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .public-asset-notes {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
 }
 
 .detail-grid {
