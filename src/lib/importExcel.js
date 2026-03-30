@@ -1,5 +1,5 @@
 import ExcelJS from 'exceljs'
-import { TYPE_LABELS, SUBTYPE_OPTIONS } from './constants'
+import { TYPE_LABELS, SUBTYPE_OPTIONS, STATUS_OPTIONS, STATUS_LABELS } from './constants'
 
 function buildArticleMap() {
   const map = new Map()
@@ -13,6 +13,18 @@ function buildArticleMap() {
 }
 
 const articleMap = buildArticleMap()
+
+function buildStatusLookupMap() {
+  const map = new Map()
+  for (const key of STATUS_OPTIONS) {
+    map.set(normalize(STATUS_LABELS[key]), key)
+    map.set(normalize(key.replace(/_/g, ' ')), key)
+    map.set(normalize(key), key)
+  }
+  return map
+}
+
+const statusLookupMap = buildStatusLookupMap()
 
 function normalize(s) {
   if (!s || typeof s !== 'string') return ''
@@ -84,6 +96,12 @@ function parseIssuedAt(val) {
   return m ? m[1] : null
 }
 
+function parseStatus(val) {
+  const s = String(val ?? '').trim()
+  if (!s) return 'SPARE'
+  return statusLookupMap.get(normalize(s)) || 'SPARE'
+}
+
 export async function parseAssetsFromExcel(buffer) {
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.load(buffer)
@@ -93,7 +111,7 @@ export async function parseAssetsFromExcel(buffer) {
   const errors = []
   const headerNames = [
     'ARTICLE', 'DESCRIPTION', 'SERIAL NUMBER', 'OLD PROPERTY NUMBER', 'NEW PROPERTY NUMBER', 'YEAR OF ACQ.',
-    'TOTAL VALUE', 'ISSUED TO', 'DATE ISSUED', 'LOCATION',
+    'STATUS', 'TOTAL VALUE', 'ISSUED TO', 'DATE ISSUED', 'LOCATION',
     'QUANTITY per PROPERTY CARD', 'QUANTITY per PHYSICAL COUNT', 'REMARKS',
   ]
 
@@ -174,7 +192,7 @@ export async function parseAssetsFromExcel(buffer) {
       name: (descParsed.name || nameFromDesc) || '',
       type: parsed.type,
       subtype: parsed.subtype,
-      status: 'SPARE',
+      status: parseStatus(get('STATUS')),
       serialNumber,
       issuedTo: get('ISSUED TO') || null,
       issuedAt: parseIssuedAt(get('DATE ISSUED')) || null,
